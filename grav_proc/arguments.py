@@ -4,8 +4,10 @@ from tkinter import filedialog as fd
 from tkinter import simpledialog as sd
 from tkinter import messagebox as mb
 
-def cli_rgrav_arguments():
 
+# Функция для получения аргументов командной строки для программы rgrav
+def cli_rgrav_arguments():
+    # Создаем парсер для аргументов командной строки
     parser = argparse.ArgumentParser(
         prog='rgrav',
         description='Read CG-6 data file and compute ties',
@@ -13,6 +15,7 @@ def cli_rgrav_arguments():
         exit_on_error=False
     )
 
+    # Определяем аргументы командной строки
     parser.add_argument(
         '--method',
         type=str,
@@ -75,30 +78,36 @@ def cli_rgrav_arguments():
         help='Fix Station'
     )
 
+    # Возвращаем аргументы командной строки
     return parser.parse_args()
 
+
+# Функция для получения аргументов в графическом интерфейсе для программы rgrav
 def gui_rgrav_arguments():
-    
-    method=sd.askstring(
+    # Запрашиваем у пользователя метод решения через диалоговое окно
+    method = sd.askstring(
         title='Solve method',
         initialvalue='WLS',
         prompt='Enter method (WLS or RLM):',
     )
-    
+
+    # Запрашиваем у пользователя файлы данных
     data_file_names = fd.askopenfilenames(
         defaultextension='.dat',
         filetypes=[('CG-6 data files', '*.dat'), ('All files', '*')],
         title='Choose data file'
     )
-    
+
     arguments = []
     parser = argparse.ArgumentParser()
 
+    # Запрашиваем, нужны ли калибровочные файлы
     scale_factors_mode = mb.askyesno(
         title='Calibration file selected',
         message='Want to load a calibration factors?'
     )
 
+    # Если пользователь выбрал загрузку калибровочных факторов, запрашиваем их
     if scale_factors_mode:
         scale_factors = fd.askopenfilenames(
             defaultextension='.txt',
@@ -106,11 +115,13 @@ def gui_rgrav_arguments():
             title='Choose data file'
         )
 
+    # Запрашиваем, нужно ли производить расчеты по линиям
     by_lines_mode = mb.askyesno(
         title='Calc by lines',
         message='Want to calc by lines?'
     )
 
+    # Добавляем аргументы в список для дальнейшей обработки
     parser.add_argument('--method', type=str)
     arguments.append('--method')
     arguments.append(method)
@@ -133,11 +144,13 @@ def gui_rgrav_arguments():
     parser.add_argument('--map', action='store_true')
     parser.add_argument('--verbose', action='store_true')
 
+    # Возвращаем аргументы, которые были собраны
     return parser.parse_args(arguments)
-    
 
+
+# Функция для получения аргументов командной строки для программы vgrad
 def cli_vgrad_arguments():
-
+    # Создаем парсер для аргументов командной строки
     parser = argparse.ArgumentParser(
         prog='vgrad',
         description='Read CG-6 data file and compute vertical gradient',
@@ -145,6 +158,7 @@ def cli_vgrad_arguments():
         exit_on_error=False
     )
 
+    # Определяем аргументы командной строки
     parser.add_argument(
         '--input',
         nargs='+',
@@ -184,32 +198,36 @@ def cli_vgrad_arguments():
         help='Calibration factors for all gravimeters'
     )
 
+    # Возвращаем аргументы командной строки
     return parser.parse_args()
 
 
+# Функция для получения аргументов в графическом интерфейсе для программы vgrad
 def gui_vgrad_arguments():
-    
+    # Запрашиваем у пользователя файлы данных
     data_file_names = fd.askopenfilenames(
         defaultextension='.dat',
         filetypes=[('CG-6 data files', '*.dat'), ('All files', '*')],
         title='Choose data file'
     )
-    
+
     arguments = []
     parser = argparse.ArgumentParser()
 
+    # Запрашиваем, нужны ли калибровочные файлы
     scale_factors_mode = mb.askyesno(
         title='Calibration file selected',
         message='Want to load a calibration factors?'
     )
-    
+
     if scale_factors_mode:
         scale_factors = fd.askopenfilenames(
             defaultextension='.txt',
             filetypes=[('Calibration files', '*.txt'), ('All files', '*')],
             title='Choose data file'
         )
-    
+
+    # Запрашиваем у пользователя файлы для сохранения коэффициентов и привязок
     coeffs = fd.asksaveasfilename(
         defaultextension='.csv',
         filetypes=[('Vertical gradient coefficients', '*.csv'), ('All files', '*')],
@@ -222,17 +240,18 @@ def gui_vgrad_arguments():
         title='Save ties file'
     )
 
-
+    # Спрашиваем у пользователя, нужно ли строить график
     plot_mode = mb.askyesno(
         title='Plot results',
         message='Want to plot a vertical gradient?'
     )
-    
+
+    # Спрашиваем, нужно ли выводить результаты в консоль
     verbose_mode = mb.askyesno(
         title='Verbose mode',
         message='Want to verbose mode?'
     )
- 
+
     parser.add_argument('--input')
     arguments.append('--input')
     arguments.append(data_file_names)
@@ -258,5 +277,5 @@ def gui_vgrad_arguments():
         arguments.append('--scale_factors')
         arguments.append(scale_factors)
 
+    # Возвращаем аргументы, которые были собраны
     return parser.parse_args(arguments)
- 

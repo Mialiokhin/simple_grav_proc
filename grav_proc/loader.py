@@ -1,46 +1,48 @@
 '''
-Set of utilites for relative gravity processing
+Set of utilities for relative gravity processing
 '''
 
+# Импорт необходимых библиотек для работы с датами, регулярными выражениями и DataFrame
 from datetime import datetime as dt
 import re
 import pandas as pd
 
 def format_detect(data_file):
+    # Функция для определения формата файла (CG-6 или CG-5) по содержимому первых строк.
     for line in data_file:
-        line = line.strip()
-        if not line or line == '/':
+        line = line.strip()  # Убираем лишние пробелы
+        if not line or line == '/':  # Пропускаем пустые строки или строки с символом "/"
             continue
-        if line[0] == '/':
+        if line[0] == '/':  # Если строка начинается с "/", проверяем формат
             line = line[1:].strip()
             match line.split()[0]:
-                case 'CG-6':
+                case 'CG-6':  # Если начинается с "CG-6", это файл формата CG-6
                     data_file.seek(0)
                     return 'cg6'
-                case 'CG-5':
+                case 'CG-5':  # Если начинается с "CG-5", это файл формата CG-5
                     data_file.seek(0)
                     return 'cg5'
-                case _:
+                case _:  # Если формат неизвестен, возвращаем None
                     data_file.seek(0)
                     return None
 
-
 def read_data(data_files):
-    ''' Load data from CG-6 data file'''
-
+    ''' Load data from CG-6 or CG-5 data file '''
+    # Функция для чтения данных в зависимости от формата файла (CG-5 или CG-6)
     match format_detect(data_files[0]):
         case 'cg5':
-            return cg5_to_cg6_converter(cg5_reader(data_files))
+            return cg5_to_cg6_converter(cg5_reader(data_files))  # Преобразуем данные CG-5 в формат CG-6
         case 'cg6':
-            return cg6_reader(data_files)
+            return cg6_reader(data_files)  # Читаем данные CG-6
         case _:
             raise ImportError(f'{data_files[0].name} data file must be in CG-x format')
 
-
 def cg5_reader(data_files):
+    # Функция для чтения данных CG-5
 
     meter_type = 'cg5'
 
+    # Создаем словарь для хранения данных
     rows = {
         'Survey name': [],
         'Instrument S/N': [],
@@ -90,47 +92,46 @@ def cg5_reader(data_files):
     }
 
     for data_file in data_files:
-        if format_detect(data_file) != meter_type:
+        if format_detect(data_file) != meter_type:  # Проверяем соответствие формата данных
             raise ImportError(f'{data_file.name} data file must be in {meter_type.upper()} format')
-        
-        lines = data_file.readlines()
+
+        lines = data_file.readlines()  # Читаем строки из файла
         data_file.close()
 
         line_station_format = False
-
         row = {}
         for line in lines:
             if not line.strip():
-                continue
+                continue  # Пропускаем пустые строки
             match line[:2].strip():
                 case '/':
                     split_line = re.split(':', line[1:])
                     for index in range(len(split_line)):
                         split_line[index] = split_line[index].strip()
                     if len(split_line) > 1:
-                        row.update({split_line[0]: ' '.join(x for x in split_line[1:])})
-                case '/-':
+                        row.update({split_line[0]: ' '.join(x for x in split_line[1:])})  # Обрабатываем строки, начинающиеся с "/"
+                case '/-':  # Обрабатываем строки, содержащие заголовки
                     line = line[1:].replace('-', ' ')
                     headers = line.split()
                 case 'Li':
-                    line_station_format = True
+                    line_station_format = True  # Флаг для строк, содержащих станции
                 case _:
                     split_line = line.split()
                     for index in range(len(split_line)):
-                        row.update({headers[index]: split_line[index]})
+                        row.update({headers[index]: split_line[index]})  # Заполняем словарь данными
                     row.update({'MeterType': meter_type.upper()})
                     row.update({'DataFile': data_file.name})
                     created = dt.strptime(' '.join(row['Date'].split('/')+row['Time'].split(':')), '%Y %m %d %H %M %S')
                     date_time = dt.strptime(' '.join(row['DATE'].split('/')+row['TIME'].split(':')), '%Y %m %d %H %M %S')
                     row.update({'Created': created})
                     row.update({'Date_time': date_time})
-                   
-                    for key, value in row.items():
-                        rows[key].append(value)
-   
-    cg_data = pd.DataFrame(rows)
 
-    cg_data = cg_data.astype(
+                    for key, value in row.items():
+                        rows[key].append(value)  # Добавляем значения в соответствующие столбцы словаря
+
+    cg_data = pd.DataFrame(rows)  # Преобразуем словарь в DataFrame для дальнейшей обработки
+
+    cg_data = cg_data.astype(  # Приводим типы данных к нужным форматам
         {
             'Instrument S/N': 'int',
             'ZONE': 'int',
@@ -175,20 +176,23 @@ def cg5_reader(data_files):
     # cg_data['Date_time'] = cg_data.apply(
         # lambda x: dt.strptime(' '.join(x['DATE'].split('/')+x['TIME'].split(':')), '%Y %m %d %H %M %S'), axis=1)
 
-    return cg_data
+    return cg_data # Возвращаем обработанный DataFrame
 
 def std_dev_to_std_err(std_dev, dur, rej):
+    # Функция для расчета стандартной ошибки на основе стандартного отклонения, длительности измерения и количества отклонений
     num = dur - rej
     if num <= 0:
         return std_dev
     return std_dev / num**0.5
-    
+
 
 def cg5_to_cg6_converter(cg5_data):
+    # Функция для конвертации данных CG-5 в формат CG-6
 
-    cg5_data = cg5_data.reset_index(drop=True)
+    cg5_data = cg5_data.reset_index(drop=True)  # Сброс индексов DataFrame
     cg6_data = pd.DataFrame()
 
+    # Создание столбцов для CG-6 на основе данных CG-5
     cg6_data['Survey Name'] = cg5_data['Survey name']
     cg6_data['Instrument Serial Number'] = cg5_data['Instrument S/N']
     cg6_data['Created'] = cg5_data['Created']
@@ -232,12 +236,14 @@ def cg5_to_cg6_converter(cg5_data):
     cg6_data['MeterType'] = cg5_data['MeterType']
     cg6_data['DataFile'] = cg5_data['DataFile']
     cg6_data['date_time'] = cg5_data['Date_time']
-    
-    return cg6_data
+
+    return cg6_data  # Возвращаем конвертированные данные
 
 def cg6_reader(data_files):
+    # Функция для чтения данных CG-6
+
     meter_type = 'cg6'
-    rows = {
+    rows = {  # Создаем словарь для хранения данных
         'Survey Name': [],
         'Instrument Serial Number': [],
         'Created': [],
@@ -283,39 +289,39 @@ def cg6_reader(data_files):
     }
 
     for data_file in data_files:
-        if format_detect(data_file) != meter_type:
+        if format_detect(data_file) != meter_type:  # Проверка на формат файла CG-6
             raise ImportError(f'{data_file.name} data file must be in {meter_type.upper()} format')
 
         lines = data_file.readlines()
         data_file.close()
-            
+
         row = {}
         for line in lines:
             if not line.strip():
-                continue
+                continue  # Пропускаем пустые строки
             match line[:2].strip():
                 case '/':
                     split_line = re.split(':', line[1:])
                     for index in range(len(split_line)):
                         split_line[index] = split_line[index].strip()
                     if len(split_line) > 1:
-                        row.update({split_line[0]: ' '.join(x for x in split_line[1:])})
+                        row.update({split_line[0]: ' '.join(x for x in split_line[1:])})  # Обработка строк с "/"
                 case '/S':
                     line = line[1:]
-                    headers = line.split()
+                    headers = line.split()  # Определение заголовков данных
                 case _:
                     split_line = line.split()
                     for index in range(len(split_line)):
-                        row.update({headers[index]: split_line[index]})
+                        row.update({headers[index]: split_line[index]})  # Заполняем словарь данными
                     row.update({'MeterType': meter_type.upper()})
                     row.update({'DataFile': data_file.name})
-                    
+
                     for key, value in row.items():
-                        rows[key].append(value)    
+                        rows[key].append(value)  # Заполняем значения для DataFrame
 
-    cg_data = pd.DataFrame(rows)        
+    cg_data = pd.DataFrame(rows)  # Преобразуем словарь в DataFrame
 
-    cg_data = cg_data.astype(
+    cg_data = cg_data.astype(  # Приводим типы данных к нужным форматам
         {
             'Instrument Serial Number': 'int',
             'Gcal1 [mGal]': 'float',
@@ -352,6 +358,7 @@ def cg6_reader(data_files):
         errors='ignore'
     )
 
+    # Преобразуем текстовые даты и время в datetime объекты
     cg_data['Created'] = pd.to_datetime(
         cg_data['Created'],
         format='%Y-%m-%d %H %M %S',
@@ -362,32 +369,33 @@ def cg6_reader(data_files):
         format='%Y-%m-%d %H %M %S'
     )
 
+    # Создание дополнительного поля с объединёнными данными и временем
     cg_data['date_time'] = cg_data.apply(
         lambda x: dt.strptime('{d} {t}'.format(d=x['Date'], t=x['Time']), '%Y-%m-%d %H:%M:%S'),
         axis=1
     )
 
-    return cg_data
+    return cg_data  # Возвращаем обработанный DataFrame
 
 def read_scale_factors(calibration_files):
-    
+
     ''' Get calibration factors from file(s) '''
-    
-    scale_factors = pd.DataFrame()
+    # Функция для чтения калибровочных коэффициентов для приборов
+
+    scale_factors = pd.DataFrame()  # Создаём пустой DataFrame для сохранения данных
 
     for calibration_file in calibration_files:
         calibration_data = pd.read_csv(
             calibration_file.name,
-            delimiter=' ',
+            delimiter=' ',  # Используем пробел в качестве разделителя
             names = [
-                'instrument_serial_number',
-                'scale_factor',
-                'scale_factor_std'
+                'instrument_serial_number',  # Серийный номер прибора
+                'scale_factor',  # Калибровочный коэффициент
+                'scale_factor_std'  # Стандартное отклонение калибровочного коэффициента
             ]
         )
-        scale_factors = pd.concat([scale_factors, calibration_data], axis=0)
+        scale_factors = pd.concat([scale_factors, calibration_data], axis=0)  # Объединяем данные всех файлов
 
-    scale_factors = scale_factors.reset_index()
+    scale_factors = scale_factors.reset_index()  # Сбрасываем индексы для удобства
 
-    return scale_factors
-    
+    return scale_factors  # Возвращаем итоговый DataFrame с калибровочными коэффициентами

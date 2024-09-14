@@ -6,25 +6,27 @@ import networkx as nx
 import statsmodels.api as sm
 
 
+# Функции для замены GPS-координат на пользовательские, если GPS данные отсутствуют
 def replace_lat(lat_user, lat_gps):
     if lat_gps == '--':
-        result = lat_user
+        result = lat_user  # Если GPS данные отсутствуют, используем пользовательские данные
     else:
-        result = lat_gps
+        result = lat_gps  # В противном случае используем GPS данные
     return float(result)
+
 
 def replace_lon(lon_user, lon_gps):
     if lon_gps == '--':
-        result = lon_user
+        result = lon_user  # Если GPS данные отсутствуют, используем пользовательские данные
     else:
-        result = lon_gps
+        result = lon_gps  # В противном случае используем GPS данные
     return float(result)
 
 
+# Функция подготовки данных для обработки
 def make_frame_to_proc(cg_data):
     ''' Make a data frame to processing (only needed columns to be selected) '''
-
-
+    # Выбираем необходимые столбцы
     headers = [
         'date_time',
         'created',
@@ -44,30 +46,39 @@ def make_frame_to_proc(cg_data):
 
     data = cg_data
 
-    data['CorrGrav'] = data['CorrGrav'] * 1e3
-    data['StdErr']  = data['StdErr'] * 1e3
-    data['InstrHeight'] = data['InstrHeight'] * 1e3
+    # Преобразование единиц измерения данных
+    data['CorrGrav'] = data['CorrGrav'] * 1e3  # Преобразование значений гравитации в микрогалы
+    data['StdErr'] = data['StdErr'] * 1e3  # Преобразование стандартной ошибки в микрогалы
+    data['InstrHeight'] = data['InstrHeight'] * 1e3  # Преобразование высоты инструмента в мм
 
+    # Группировка данных по номеру прибора и станции
     group_by_meter_station = data.groupby(['Instrument Serial Number', 'Station'])
     for meter_station, grouped_by_meter_station in group_by_meter_station:
         meter, station = meter_station
         indices = grouped_by_meter_station.index
 
-        grouped_by_meter_station['LatGPS'] = grouped_by_meter_station.apply(lambda x: replace_lat(x['LatUser'], x['LatGPS']), axis=1)
-        grouped_by_meter_station['LonGPS'] = grouped_by_meter_station.apply(lambda x: replace_lat(x['LonUser'], x['LonGPS']), axis=1)
-        
+        # Замена GPS-координат, если они отсутствуют
+        grouped_by_meter_station['LatGPS'] = grouped_by_meter_station.apply(
+            lambda x: replace_lat(x['LatUser'], x['LatGPS']), axis=1)
+        grouped_by_meter_station['LonGPS'] = grouped_by_meter_station.apply(
+            lambda x: replace_lon(x['LonUser'], x['LonGPS']), axis=1)
+
+        # Расчет средней и стандартной ошибки широты и долготы
         lat = grouped_by_meter_station['LatGPS'].mean()
         lat_std = grouped_by_meter_station['LatGPS'].std()
         lon = grouped_by_meter_station['LonGPS'].mean()
         lon_std = grouped_by_meter_station['LonGPS'].std()
 
+        # Если ошибка слишком велика, выводим предупреждение
         if lat_std > 0.001 or lon_std > 0.001:
             print(f'WARNING: {meter} {station}')
             print('    lat_std = ', lat_std, ', lon_std = ', lon_std)
 
+        # Обновление координат в исходных данных
         data.loc[indices, 'lat'] = lat
         data.loc[indices, 'lon'] = lon
-    
+
+    # Преобразование исходных данных для дальнейшей обработки
     data = data[
         [
             'date_time',
@@ -87,25 +98,26 @@ def make_frame_to_proc(cg_data):
         ]
     ]
 
+    # Переименовываем столбцы для удобства работы
     data.columns = headers
 
     return data
 
 
+# Функция для получения средних значений сигналов от разных приборов
 def get_meters_readings(cg_data):
     ''' Get mean values of signals of readings from different meters '''
-
     readings = pd.DataFrame()
     group_by_meters = cg_data.groupby('instrument_serial_number')
     for meter, meter_data in group_by_meters:
-        meter_readings = get_readings(meter_data)
+        meter_readings = get_readings(meter_data)  # Получаем средние значения для каждого прибора
         readings = pd.concat([readings, meter_readings])
     return readings
 
 
+# Функция получения среднего значения сигнала для одной строки данных
 def get_readings(cg_data):
     ''' Get mean values of signals of readings '''
-
     readings = pd.DataFrame(
         columns=[
             'date_time',
@@ -124,15 +136,15 @@ def get_readings(cg_data):
             'meter_type',
         ]
     )
-    # readings['date_time'].to_datetime
     reading_index = 0
-    group_by_line = cg_data.groupby('line')
+    group_by_line = cg_data.groupby('line')  # Группировка данных по линиям измерений
     for line, line_data in group_by_line:
         trigger = False
         count = 0
-        first_date_time = line_data.iloc[0].date_time
-        first_index = line_data.iloc[0].index
+        first_date_time = line_data.iloc[0].date_time  # Получаем первое время измерения
+        first_index = line_data.iloc[0].index  # Индекс первой строки
         for index, row in line_data.iterrows():
+            # Если достигли последней строки, рассчитываем средние значения
             if index == line_data.index[-1]:
                 readings.loc[reading_index] = [
                     first_date_time + (row.date_time - first_date_time) / 2,
@@ -155,12 +167,14 @@ def get_readings(cg_data):
                 ]
                 reading_index += 1
                 break
+            # Если станции одинаковы, продолжаем процесс
             if row.station == line_data.station.iloc[count + 1]:
                 count += 1
                 if not trigger:
                     trigger = True
                     first_date_time = row.date_time
                     first_index = index
+            # Когда станции меняются, завершаем текущую итерацию и рассчитываем средние значения
             else:
                 trigger = False
                 readings.loc[reading_index] = [
@@ -184,8 +198,9 @@ def get_readings(cg_data):
                 count += 1
                 reading_index += 1
 
+    # Группировка данных по станциям для усреднения широты и долготы
     group_by_station = readings.groupby('station')
-    
+
     for station, station_readings in group_by_station:
         mean_lat = station_readings.lat_user.mean()
         mean_lon = station_readings.lon_user.mean()
@@ -194,33 +209,38 @@ def get_readings(cg_data):
 
     return readings
 
+
+# Вспомогательная функция для расчета взвешенного среднего и стандартного отклонения
 def weighted_avg_and_std(values, weights):
     """
     Return the weighted average and standard deviation.
 
-    They weights are in effect first normalized so that they 
+    They weights are in effect first normalized so that they
     sum to 1 (and so they must not all be 0).
 
     values, weights -- NumPy ndarrays with the same shape.
     """
     average = np.average(values, weights=weights)
-    # Fast and numerically precise:
-    variance = np.average((values-average)**2, weights=weights)
+    # Быстрая и численно точная оценка
+    variance = np.average((values - average) ** 2, weights=weights)
     return (average, np.sqrt(variance))
 
+
+# Получение привязок для разных приборов
 def get_meters_ties(readings):
     ''' Get ties from meters '''
     ties = pd.DataFrame()
-    
+
     group_by_meters = readings.groupby('instrument_serial_number')
-    
+
     for meter, meter_readings in group_by_meters:
         meter_ties = get_ties(meter_readings)
         ties = pd.concat([ties, meter_ties])
-    
+
     return ties
 
 
+# Функция расчета привязок между станциями
 def get_ties(readings):
     ''' Get ties '''
     ties = pd.DataFrame(columns=[
@@ -333,7 +353,8 @@ def get_ties(readings):
                 })
     return ties
 
-    
+
+# Функция для получения средних привязок по приборам
 def get_meters_mean_ties(ties):
     mean_ties = pd.DataFrame()
     group_by_meters = ties.groupby('instrument_serial_number')
@@ -343,9 +364,9 @@ def get_meters_mean_ties(ties):
     return mean_ties
 
 
+# Функция получения средних значений привязок
 def get_mean_ties(ties):
     ''' Get mean values of ties '''
-
     for _, row in ties.iterrows():
         from_station = row['station_from']
         to_station = row['station_to']
@@ -442,6 +463,7 @@ def get_mean_ties(ties):
     return result
 
 
+# Функция получения суммы привязок
 def get_ties_sum(ties):
     ''' Get sum of ties '''
     meter = f'{ties.iloc[0].meter_type} #{str(ties.iloc[0].instrument_serial_number)}'
@@ -464,15 +486,15 @@ def get_ties_sum(ties):
     for cicle in nx.simple_cycles(ties_graph):
         cicle.append(cicle[0])
         cicle_ties = []
-        for station_index in range(len(cicle)-1):
+        for station_index in range(len(cicle) - 1):
             line_ties = []
             for _, tie_row in ties.iterrows():
                 station_from = cicle[station_index]
-                station_to = cicle[station_index+1]
-                if station_from == tie_row.station_from and\
+                station_to = cicle[station_index + 1]
+                if station_from == tie_row.station_from and \
                         station_to == tie_row.station_to:
                     line_ties.append(tie_row.tie)
-                elif station_from == tie_row.station_to and\
+                elif station_from == tie_row.station_to and \
                         station_to == tie_row.station_from:
                     line_ties.append(-tie_row.tie)
                 else:
@@ -490,6 +512,7 @@ def get_ties_sum(ties):
     return cicles
 
 
+# Функция реверса привязки
 def reverse_tie(tie):
     ''' Reverse of tie (from -> to, to -> from, tie = - tie) '''
     reverse = [
@@ -515,33 +538,38 @@ def reverse_tie(tie):
     return reverse
 
 
+# Вспомогательные функции для преобразования времени
 def to_minutes(value):
     return value.timestamp() / 60
+
 
 def to_days(value):
     return value.timestamp() / 60 / 60 / 24
 
+
 def to_seconds(value):
     return value.timestamp()
 
+
+# Функция для оценки свободных привязок и дрифта
 def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degree=2, method='WLS'):
-    
     observation_matrix = pd.get_dummies(stations).drop(fix_station, axis=1)
 
     defined_stations = observation_matrix.columns
 
     # date_time = date_time - date_time.iloc[0]
     time_matrix = np.vander(date_time, max_degree)
-    
-    design_matrix = np.hstack((observation_matrix, time_matrix))
 
+    design_matrix = np.hstack((observation_matrix, time_matrix))
     # model = sm.RLM(input_grav, design_matrix)
+
+    # Выбор метода для моделирования: RLM или WLS
     match method:
         case 'RLM':
             model = sm.RLM(gravity, design_matrix)
         case 'WLS':
             if std is not None:
-                model = sm.WLS(gravity, design_matrix, weights=1/std)
+                model = sm.WLS(gravity, design_matrix, weights=1 / std)
             else:
                 model = sm.WLS(gravity, design_matrix)
 
@@ -564,13 +592,14 @@ def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degre
                 )
             ], ignore_index=True
         )
-    
+
     return ties, result.resid
 
 
+# Функция для подбора дрифта по станциям
 def drift_fitting(stations, grav, std_err, date_time, fix_station=None, max_degree=2):
     ''' drift_fitting'''
-    
+
     readings = np.vstack(grav.array)
     readings = readings - readings[0]
 
@@ -582,11 +611,11 @@ def drift_fitting(stations, grav, std_err, date_time, fix_station=None, max_degr
         desired_stations = desired_stations[desired_stations != fix_station]
     else:
         desired_stations = desired_stations[desired_stations != desired_stations[0]]
-    
+
     if max_degree > 1:
         for degree in range(2, max_degree + 1):
             times = np.hstack((times, np.power(times, degree)))
-    
+
     rows = []
     for station in stations:
         row = []
@@ -595,22 +624,23 @@ def drift_fitting(stations, grav, std_err, date_time, fix_station=None, max_degr
             row.append(value)
         rows.append(row)
     station_grav = np.array(rows)
-    
+
     ones = np.ones(shape=(readings.size, 1))
-    
+
     design_matrix = np.concatenate((station_grav, times, ones), axis=1)
     # design_matrix = np.concatenate((times, ones), axis=1)
 
     # model = sm.OLS(readings, design_matrix)
     # model = sm.WLS(readings, design_matrix, weights=np.array(std_err)**-2)
     model = sm.RLM(readings, design_matrix)
-    
+
     result = model.fit()
 
     return [(value, std) for value, std in zip(result.params, result.bse)]
 
+
+# Получение привязок по линиям
 def get_meter_ties_by_lines(readings):
-    
     lines = {
         'station_from': [],
         'station_to': [],
@@ -651,11 +681,12 @@ def get_meter_ties_by_lines(readings):
                 lines['instr_height_to'].append(line_data[line_data.station == station].instr_height.mean())
                 lines['tie'].append(grav[0])
                 lines['err'].append(grav[1])
-        
+
     return pd.DataFrame(lines)
 
+
+# Получение всех привязок по приборам
 def get_meter_ties_all(readings):
-    
     lines = {}
 
     lines['station_from'] = []
@@ -695,16 +726,18 @@ def get_meter_ties_all(readings):
 
     return pd.DataFrame(lines)
 
-def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False):
 
+# Основная функция подбора привязок для конкретного прибора и его измерений
+def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False):
     ties = pd.DataFrame()
     fix_station = anchor
 
     if by_lines:
-        groupby = raw_data.groupby(['instrument_serial_number', 'created', 'survey_name', 'operator', 'meter_type', 'line'])
+        groupby = raw_data.groupby(
+            ['instrument_serial_number', 'created', 'survey_name', 'operator', 'meter_type', 'line'])
     else:
         groupby = raw_data.groupby(['instrument_serial_number', 'created', 'survey_name', 'operator', 'meter_type'])
-    
+
     for meter_created_survey_operator_meter_type, grouped in groupby:
 
         indices = grouped.index
@@ -748,6 +781,5 @@ def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False):
                 fitgrav.loc[idx, 'line'] = int(line)
 
         ties = pd.concat([ties, fitgrav], ignore_index=True)
-    
+
     return ties
- 
