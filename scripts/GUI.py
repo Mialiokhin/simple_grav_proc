@@ -1,7 +1,6 @@
 import os
 import tkinter as tk
-from tkinter import filedialog, messagebox
-from tkinter import ttk
+from tkinter import filedialog, messagebox, ttk
 
 from grav_proc.loader import read_data, read_scale_factors
 from grav_proc.calculations import make_frame_to_proc, fit_by_meter_created
@@ -57,9 +56,25 @@ class GravityApp:
         self.vg_button = tk.Button(root, text="Calculate vertical gradient", command=self.calculate_vg)
         self.vg_button.pack(pady=10)
 
+        # Рамка для текстового поля и прокрутки
+        self.text_frame = tk.Frame(root)
+        self.text_frame.pack(pady=10)
+
         # Поле для вывода отчета
-        self.report_text = tk.Text(root, height=10, width=100)
-        self.report_text.pack(pady=10)
+        self.report_text = tk.Text(self.text_frame, height=10, width=100,
+                                   wrap=tk.NONE)  # wrap=tk.NONE для горизонтальной прокрутки
+        self.report_text.grid(row=0, column=0)
+
+        # Горизонтальная прокрутка
+        self.x_scrollbar = tk.Scrollbar(self.text_frame, orient=tk.HORIZONTAL, command=self.report_text.xview)
+        self.x_scrollbar.grid(row=1, column=0, sticky="ew")
+
+        # Вертикальная прокрутка
+        self.y_scrollbar = tk.Scrollbar(self.text_frame, command=self.report_text.yview)
+        self.y_scrollbar.grid(row=0, column=1, sticky="ns")
+
+        # Связываем прокрутки с текстовым полем
+        self.report_text.config(yscrollcommand=self.y_scrollbar.set, xscrollcommand=self.x_scrollbar.set)
 
     def load_data_files(self):
         """Функция для выбора файлов данных"""
