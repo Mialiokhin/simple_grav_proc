@@ -269,7 +269,7 @@ def gui_vgrad_arguments():
         arguments.append('--plot')
 
     parser.add_argument('--verbose', action='store_true')
-    if plot_mode:
+    if verbose_mode:
         arguments.append('--verbose')
 
     parser.add_argument('--scale_factors')
