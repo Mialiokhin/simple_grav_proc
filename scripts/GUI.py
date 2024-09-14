@@ -13,30 +13,30 @@ from grav_proc.reports import get_report, make_vg_ties_report, make_vg_coeffs_re
 class GravityApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Гравиметрическое приложение")
+        self.root.title("Simple_grav_proc")
 
         # Заголовок
-        self.title_label = tk.Label(root, text="Гравиметрическое приложение", font=("Helvetica", 16))
+        self.title_label = tk.Label(root, text="Simple_grav_proc", font=("Helvetica", 16))
         self.title_label.pack(pady=10)
 
         # Поля выбора файлов данных
-        self.data_files_label = tk.Label(root, text="Выберите файлы данных:")
+        self.data_files_label = tk.Label(root, text="Survey Data:")
         self.data_files_label.pack(pady=5)
         self.data_files_entry = tk.Entry(root, width=50)
         self.data_files_entry.pack(pady=5)
-        self.data_files_button = tk.Button(root, text="Загрузить файлы", command=self.load_data_files)
+        self.data_files_button = tk.Button(root, text="Import", command=self.load_data_files)
         self.data_files_button.pack(pady=5)
 
         # Поля выбора файлов коэффициентов
-        self.coeff_files_label = tk.Label(root, text="Выберите файл коэффициентов (необязательно):")
+        self.coeff_files_label = tk.Label(root, text="Calibration Data (optional):")
         self.coeff_files_label.pack(pady=5)
         self.coeff_files_entry = tk.Entry(root, width=50)
         self.coeff_files_entry.pack(pady=5)
-        self.coeff_files_button = tk.Button(root, text="Загрузить коэффициенты", command=self.load_coeff_files)
+        self.coeff_files_button = tk.Button(root, text="Import", command=self.load_coeff_files)
         self.coeff_files_button.pack(pady=5)
 
         # Выбор метода расчета
-        self.method_label = tk.Label(root, text="Выберите метод расчета:")
+        self.method_label = tk.Label(root, text="Select the calculation method:")
         self.method_label.pack(pady=5)
         self.method_var = tk.StringVar()
         self.method_combo = ttk.Combobox(root, textvariable=self.method_var)
@@ -46,26 +46,26 @@ class GravityApp:
 
         # Флаг расчета по линиям
         self.by_lines_var = tk.BooleanVar()
-        self.by_lines_check = tk.Checkbutton(root, text="Рассчитать по линиям", variable=self.by_lines_var)
+        self.by_lines_check = tk.Checkbutton(root, text="Use Loops", variable=self.by_lines_var)
         self.by_lines_check.pack(pady=5)
 
         # Кнопка запуска расчета привязок (Ties)
-        self.ties_button = tk.Button(root, text="Рассчитать привязки (Ties)", command=self.calculate_ties)
+        self.ties_button = tk.Button(root, text="Solve ties", command=self.calculate_ties)
         self.ties_button.pack(pady=10)
 
         # Кнопка запуска расчета вертикального градиента
-        self.vg_button = tk.Button(root, text="Рассчитать вертикальный градиент", command=self.calculate_vg)
+        self.vg_button = tk.Button(root, text="Calculate vertical gradient", command=self.calculate_vg)
         self.vg_button.pack(pady=10)
 
         # Поле для вывода отчета
-        self.report_text = tk.Text(root, height=10, width=70)
+        self.report_text = tk.Text(root, height=10, width=100)
         self.report_text.pack(pady=10)
 
     def load_data_files(self):
         """Функция для выбора файлов данных"""
         files = filedialog.askopenfilenames(
-            title="Выберите файлы данных",
-            filetypes=[("CG-6 Data Files", "*.dat"), ("Все файлы", "*.*")]
+            title="Select the data files",
+            filetypes=[("CG-6 Data Files", "*.dat"), ("All files", "*.*")]
         )
         self.data_files_entry.delete(0, tk.END)
         self.data_files_entry.insert(0, ','.join(files))
@@ -73,17 +73,17 @@ class GravityApp:
     def load_coeff_files(self):
         """Функция для выбора файлов коэффициентов"""
         file = filedialog.askopenfilename(
-            title="Выберите файл коэффициентов",
-            filetypes=[("Calibration Files", "*.txt"), ("Все файлы", "*.*")]
+            title="Select the Calibration Files",
+            filetypes=[("Calibration Files", "*.txt"), ("All files", "*.*")]
         )
         self.coeff_files_entry.delete(0, tk.END)
         self.coeff_files_entry.insert(0, file)
 
     def choose_output_directory(self, survey_name, task_name):
         """Функция для выбора папки сохранения и создания новой папки для результатов"""
-        output_dir = filedialog.askdirectory(title="Выберите папку для сохранения результатов")
+        output_dir = filedialog.askdirectory(title="Select a folder to save the results to")
         if not output_dir:
-            messagebox.showwarning("Ошибка", "Папка для сохранения не выбрана!")
+            messagebox.showwarning("Error", "The folder to save is not selected!")
             return None
 
         result_dir = os.path.join(output_dir, f"{survey_name}_{task_name}")
@@ -104,7 +104,7 @@ class GravityApp:
                 scale_factor = meter_scale_factors['scale_factor'].values[0]
                 raw_data.loc[raw_data['instrument_serial_number'] == meter, 'corr_grav'] *= scale_factor
         except Exception as e:
-            messagebox.showerror("Ошибка", f"Ошибка при применении коэффициентов: {e}")
+            messagebox.showerror("Error", f"Error when applying calibration factor: {e}")
 
         return raw_data
 
@@ -143,9 +143,9 @@ class GravityApp:
             self.report_text.delete(1.0, tk.END)
             self.report_text.insert(tk.END, report)
 
-            messagebox.showinfo("Успешно", f"Расчет привязок завершен! Отчет сохранен в {ties_report_file}")
+            messagebox.showinfo("Successfully", f"The calculation of the ties is completed! The report is saved in {ties_report_file}")
         except Exception as e:
-            messagebox.showerror("Ошибка", f"Ошибка при расчете привязок: {e}")
+            messagebox.showerror("Error", f"Error in calculating ties: {e}")
 
     def calculate_vg(self):
         """Расчет вертикального градиента"""
@@ -183,11 +183,11 @@ class GravityApp:
 
             self.report_text.delete(1.0, tk.END)
             self.report_text.insert(tk.END,
-                                    f"Расчет вертикального градиента завершен. Отчеты и графики сохранены в {result_dir}.")
+                                    f"The calculation of the vertical gradient is completed. Reports and graphs are saved in {result_dir}.")
 
-            messagebox.showinfo("Успешно", f"Расчет вертикального градиента завершен. Отчеты и графики сохранены в {result_dir}")
+            messagebox.showinfo("Successfully", f"The calculation of the vertical gradient is completed. Reports and graphs are saved in {result_dir}")
         except Exception as e:
-            messagebox.showerror("Ошибка", f"Ошибка при расчете вертикального градиента: {e}")
+            messagebox.showerror("Error", f"Error in calculating the vertical gradient: {e}")
 
 
 if __name__ == "__main__":
