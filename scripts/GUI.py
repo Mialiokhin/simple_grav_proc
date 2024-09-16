@@ -64,9 +64,22 @@ class GravityApp:
 
         self.data = None
 
-        # Поле для отчета
-        self.report_text = tk.Text(root, height=10, width=100, wrap=tk.NONE)
-        self.report_text.pack(pady=10)
+        # Поле для отчета с прокрутками
+        self.report_frame = tk.Frame(root)
+        self.report_frame.pack(fill="both", expand=True)
+
+        self.x_scrollbar = tk.Scrollbar(self.report_frame, orient="horizontal")
+        self.x_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+
+        self.y_scrollbar = tk.Scrollbar(self.report_frame, orient="vertical")
+        self.y_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.report_text = tk.Text(self.report_frame, height=10, wrap=tk.NONE, xscrollcommand=self.x_scrollbar.set,
+                                   yscrollcommand=self.y_scrollbar.set)
+        self.report_text.pack(fill="both", expand=True)
+
+        self.x_scrollbar.config(command=self.report_text.xview)
+        self.y_scrollbar.config(command=self.report_text.yview)
 
     def load_data_files(self):
         """Загрузка файлов данных и отображение в таблице"""
