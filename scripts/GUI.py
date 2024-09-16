@@ -1,7 +1,8 @@
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-
+import pandas as pd
+from components.input_data_table import InputDataTable
 from grav_proc.loader import read_data, read_scale_factors
 from grav_proc.calculations import make_frame_to_proc, fit_by_meter_created
 from grav_proc.vertical_gradient import get_vg
@@ -48,36 +49,27 @@ class GravityApp:
         self.by_lines_check = tk.Checkbutton(root, text="Use Loops", variable=self.by_lines_var)
         self.by_lines_check.pack(pady=5)
 
-        # Кнопка запуска расчета привязок (Ties)
+        # Кнопка запуска расчета (Ties)
         self.ties_button = tk.Button(root, text="Solve ties", command=self.calculate_ties)
         self.ties_button.pack(pady=10)
 
-        # Кнопка запуска расчета вертикального градиента
+        # Кнопка для расчета вертикального градиента
         self.vg_button = tk.Button(root, text="Calculate vertical gradient", command=self.calculate_vg)
         self.vg_button.pack(pady=10)
 
-        # Рамка для текстового поля и прокрутки
-        self.text_frame = tk.Frame(root)
-        self.text_frame.pack(pady=10)
+               # Таблица для отображения данных
+        self.table_frame = tk.Frame(root)
+        self.table_frame.pack(pady=10)
+        self.table = None  # Здесь будет EditableTable
 
-        # Поле для вывода отчета
-        self.report_text = tk.Text(self.text_frame, height=10, width=100,
-                                   wrap=tk.NONE)  # wrap=tk.NONE для горизонтальной прокрутки
-        self.report_text.grid(row=0, column=0)
+        self.data = None
 
-        # Горизонтальная прокрутка
-        self.x_scrollbar = tk.Scrollbar(self.text_frame, orient=tk.HORIZONTAL, command=self.report_text.xview)
-        self.x_scrollbar.grid(row=1, column=0, sticky="ew")
-
-        # Вертикальная прокрутка
-        self.y_scrollbar = tk.Scrollbar(self.text_frame, command=self.report_text.yview)
-        self.y_scrollbar.grid(row=0, column=1, sticky="ns")
-
-        # Связываем прокрутки с текстовым полем
-        self.report_text.config(yscrollcommand=self.y_scrollbar.set, xscrollcommand=self.x_scrollbar.set)
+        # Поле для отчета
+        self.report_text = tk.Text(root, height=10, width=100, wrap=tk.NONE)
+        self.report_text.pack(pady=10)
 
     def load_data_files(self):
-        """Функция для выбора файлов данных"""
+        """Загрузка файлов данных и отображение в таблице"""
         files = filedialog.askopenfilenames(
             title="Select the data files",
             filetypes=[("CG-6 Data Files", "*.dat"), ("All files", "*.*")]
@@ -85,8 +77,21 @@ class GravityApp:
         self.data_files_entry.delete(0, tk.END)
         self.data_files_entry.insert(0, ','.join(files))
 
+        # Загрузка данных
+        data_files = [open(file, 'r', encoding='utf-8') for file in files]
+        self.data = make_frame_to_proc(read_data(data_files))
+
+        # Если таблица уже существует, удаляем ее перед созданием новой
+        if self.table:
+            self.table.tree.pack_forget()
+            self.table.v_scroll.pack_forget()
+            self.table.h_scroll.pack_forget()
+
+        # Отображаем данные в таблице
+        self.table = InputDataTable(self.table_frame, self.data)
+
     def load_coeff_files(self):
-        """Функция для выбора файлов коэффициентов"""
+        """Загрузка файлов коэффициентов"""
         file = filedialog.askopenfilename(
             title="Select the Calibration Files",
             filetypes=[("Calibration Files", "*.txt"), ("All files", "*.*")]
@@ -107,7 +112,7 @@ class GravityApp:
         return result_dir
 
     def apply_scale_factors(self, raw_data, scale_factors_file):
-        """Применение коэффициентов калибровки, если загружен файл"""
+        """Применение коэффициентов, если загружен файл"""
         if not scale_factors_file:
             return raw_data
 
@@ -126,27 +131,26 @@ class GravityApp:
     def calculate_ties(self):
         """Расчет привязок (Ties)"""
         try:
-            files = self.data_files_entry.get().split(',')
             coeff_file = self.coeff_files_entry.get()
             method = self.method_var.get()
             by_lines = self.by_lines_var.get()
 
-            data_files = [open(file, 'r', encoding='utf-8') for file in files]
-            raw_data = make_frame_to_proc(read_data(data_files))
+            # Обновление данных из таблицы
+            self.data = self.table.get_dataframe()
 
             # Применение коэффициентов, если загружены
-            raw_data = self.apply_scale_factors(raw_data, coeff_file)
+            self.data = self.apply_scale_factors(self.data, coeff_file)
 
             # Запрашиваем название съемки
-            survey_name = os.path.basename(files[0]).split('.')[0]
+            survey_name = os.path.basename(self.data_files_entry.get().split(',')[0]).split('.')[0]
 
             # Выбираем папку для сохранения
             result_dir = self.choose_output_directory(survey_name, "ties")
             if not result_dir:
                 return
 
-            # Запуск расчета
-            ties = fit_by_meter_created(raw_data, anchor=None, method=method, by_lines=by_lines)
+            # Расчет привязок
+            ties = fit_by_meter_created(self.data, anchor=None, method=method, by_lines=by_lines)
             report = get_report(ties)
 
             # Сохраняем отчет
@@ -154,7 +158,7 @@ class GravityApp:
             with open(ties_report_file, 'w', encoding='utf-8') as f:
                 f.write(report)
 
-            # Обновляем текстовое поле
+            # Выводим отчет
             self.report_text.delete(1.0, tk.END)
             self.report_text.insert(tk.END, report)
 
@@ -165,31 +169,28 @@ class GravityApp:
     def calculate_vg(self):
         """Расчет вертикального градиента"""
         try:
-            files = self.data_files_entry.get().split(',')
             coeff_file = self.coeff_files_entry.get()
-            data_files = [open(file, 'r', encoding='utf-8') for file in files]
-            raw_data = make_frame_to_proc(read_data(data_files))
+
+            # Обновление данных из таблицы
+            self.data = self.table.get_dataframe()
 
             # Применение коэффициентов, если загружены
-            raw_data = self.apply_scale_factors(raw_data, coeff_file)
+            self.data = self.apply_scale_factors(self.data, coeff_file)
 
             # Запрашиваем название съемки
-            survey_name = os.path.basename(files[0]).split('.')[0]
+            survey_name = os.path.basename(self.data_files_entry.get().split(',')[0]).split('.')[0]
 
             # Выбираем папку для сохранения
             result_dir = self.choose_output_directory(survey_name, "gradient")
             if not result_dir:
                 return
 
-            # Запуск расчета вертикального градиента
-            vg_ties, vg_coef = get_vg(raw_data)
+            # Расчет вертикального градиента
+            vg_ties, vg_coef = get_vg(self.data)
 
             # Генерация отчетов
-            vg_ties_report_file = os.path.join(result_dir, f"{survey_name}_vg_ties.csv")
-            make_vg_ties_report(vg_ties, vg_ties_report_file, verbose=True)
-
-            vg_coeffs_report_file = os.path.join(result_dir, f"{survey_name}_vg_coeffs.csv")
-            make_vg_coeffs_report(vg_coef, vg_coeffs_report_file, verbose=True)
+            make_vg_ties_report(vg_ties, os.path.join(result_dir, f"{survey_name}_vg_ties.csv"), verbose=True)
+            make_vg_coeffs_report(vg_coef, os.path.join(result_dir, f"{survey_name}_vg_coeffs.csv"), verbose=True)
 
             # Сохранение графиков
             figs = vg_plot(vg_coef, vg_ties)
@@ -199,7 +200,6 @@ class GravityApp:
             self.report_text.delete(1.0, tk.END)
             self.report_text.insert(tk.END,
                                     f"The calculation of the vertical gradient is completed. Reports and graphs are saved in {result_dir}.")
-
             messagebox.showinfo("Successfully", f"The calculation of the vertical gradient is completed. Reports and graphs are saved in {result_dir}")
         except Exception as e:
             messagebox.showerror("Error", f"Error in calculating the vertical gradient: {e}")

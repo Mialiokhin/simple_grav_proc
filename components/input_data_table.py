@@ -1,0 +1,106 @@
+import tkinter as tk
+from tkinter import messagebox, ttk
+import pandas as pd
+
+class InputDataTable:
+    def __init__(self, parent, dataframe):
+        self.parent = parent
+        self.dataframe = dataframe.copy()  # Копируем DataFrame
+        self.tree = None  # Здесь будет таблица
+        self.v_scroll = None  # Вертикальный скролл
+        self.h_scroll = None  # Горизонтальный скролл
+
+        self.setup_table()
+
+    def setup_table(self):
+        """Создаем таблицу и скроллы."""
+        # Проверяем, существует ли таблица, если да, то очищаем ее
+        if self.tree:
+            self.tree.delete(*self.tree.get_children())
+        else:
+            # Если таблица не существует, создаем её и скроллы
+            self.tree = ttk.Treeview(self.parent, show='headings')
+            self.v_scroll = ttk.Scrollbar(self.parent, orient="vertical", command=self.tree.yview)
+            self.h_scroll = ttk.Scrollbar(self.parent, orient="horizontal", command=self.tree.xview)
+            self.tree.configure(yscrollcommand=self.v_scroll.set, xscrollcommand=self.h_scroll.set)
+
+            # Упаковываем виджеты
+            self.tree.pack(side="top", fill="both", expand=True)
+            self.v_scroll.pack(side="right", fill="y")
+            self.h_scroll.pack(side="bottom", fill="x")
+
+        # Настройка колонок
+        self.tree["columns"] = list(self.dataframe.columns)
+        for col in self.dataframe.columns:
+            self.tree.heading(col, text=col)
+            self.tree.column(col, anchor="w", width=100)
+
+        # Добавляем данные
+        for _, row in self.dataframe.iterrows():
+            self.tree.insert("", "end", values=list(row))
+
+        # Привязываем события
+        self.tree.bind("<Double-1>", self.on_double_click)
+        self.tree.bind("<Delete>", self.delete_selected_rows)
+
+    def on_double_click(self, event):
+        """Редактирование значения ячейки прямо в таблице."""
+        # Получаем номер столбца и строки
+        region = self.tree.identify_region(event.x, event.y)
+        if region == "cell":
+            row_id = self.tree.identify_row(event.y)
+            column = self.tree.identify_column(event.x)
+            column_index = int(column.replace("#", "")) - 1
+
+            # Получаем координаты ячейки для редактирования
+            x, y, width, height = self.tree.bbox(row_id, column)
+
+            # Получаем текущее значение ячейки
+            values = self.tree.item(row_id, "values")
+            current_value = values[column_index]
+
+            # Создаем поле для редактирования внутри таблицы
+            self.entry_popup = tk.Entry(self.tree, width=width)
+            self.entry_popup.place(x=x, y=y, width=width, height=height)
+            self.entry_popup.insert(0, current_value)
+            self.entry_popup.focus()
+
+            # Сохраняем изменения при нажатии Enter
+            self.entry_popup.bind("<Return>", lambda e: self.save_value(row_id, column_index))
+            # Закрываем поле и сохраняем данные при потере фокуса
+            self.entry_popup.bind("<FocusOut>", lambda e: self.save_value(row_id, column_index))
+
+    def save_value(self, row_id, column_index):
+        """Сохранение значения ячейки при нажатии Enter или потере фокуса."""
+        if self.entry_popup:
+            new_value = self.entry_popup.get()
+            current_values = list(self.tree.item(row_id, "values"))
+            current_values[column_index] = new_value
+
+            # Обновляем данные в дереве
+            self.tree.item(row_id, values=current_values)
+
+            # Обновляем данные в DataFrame
+            row_index = self.tree.index(row_id)
+            self.dataframe.iloc[row_index, column_index] = new_value
+
+            # Закрываем поле редактирования
+            self.entry_popup.destroy()
+            self.entry_popup = None
+
+    def delete_selected_rows(self, event=None):
+        """Удаление выделенных строк."""
+        selected_items = self.tree.selection()
+        if not selected_items:
+            return
+        confirm = messagebox.askyesno("Удаление", "Вы уверены, что хотите удалить выбранные строки?")
+        if confirm:
+            for item in selected_items:
+                row_index = self.tree.index(item)
+                self.tree.delete(item)
+                # Удаляем строку из DataFrame
+                self.dataframe.drop(self.dataframe.index[row_index], inplace=True)
+
+    def get_dataframe(self):
+        """Возвращаем DataFrame с изменениями."""
+        return self.dataframe.copy()
