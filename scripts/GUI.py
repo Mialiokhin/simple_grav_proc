@@ -15,58 +15,63 @@ class GravityApp:
         self.root = root
         self.root.title("Simple_grav_proc")
 
+        # Создаем основной фрейм для компоновки
+        self.main_frame = tk.Frame(root)
+        self.main_frame.pack(fill="both", expand=True)
+
+        # Создаем фрейм для таблицы (левая часть окна)
+        self.table_frame = tk.Frame(self.main_frame)
+        self.table_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        # Создаем фрейм для остальных элементов (правая часть окна)
+        self.controls_frame = tk.Frame(self.main_frame)
+        self.controls_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
         # Заголовок
-        self.title_label = tk.Label(root, text="Simple_grav_proc", font=("Helvetica", 16))
+        self.title_label = tk.Label(self.controls_frame, text="Simple_grav_proc", font=("Helvetica", 16))
         self.title_label.pack(pady=10)
 
         # Поля выбора файлов данных
-        self.data_files_label = tk.Label(root, text="Survey Data:")
+        self.data_files_label = tk.Label(self.controls_frame, text="Survey Data:")
         self.data_files_label.pack(pady=5)
-        self.data_files_entry = tk.Entry(root, width=50)
+        self.data_files_entry = tk.Entry(self.controls_frame, width=50)
         self.data_files_entry.pack(pady=5)
-        self.data_files_button = tk.Button(root, text="Import", command=self.load_data_files)
+        self.data_files_button = tk.Button(self.controls_frame, text="Import", command=self.load_data_files)
         self.data_files_button.pack(pady=5)
 
         # Поля выбора файлов коэффициентов
-        self.coeff_files_label = tk.Label(root, text="Calibration Data (optional):")
+        self.coeff_files_label = tk.Label(self.controls_frame, text="Calibration Data (optional):")
         self.coeff_files_label.pack(pady=5)
-        self.coeff_files_entry = tk.Entry(root, width=50)
+        self.coeff_files_entry = tk.Entry(self.controls_frame, width=50)
         self.coeff_files_entry.pack(pady=5)
-        self.coeff_files_button = tk.Button(root, text="Import", command=self.load_coeff_files)
+        self.coeff_files_button = tk.Button(self.controls_frame, text="Import", command=self.load_coeff_files)
         self.coeff_files_button.pack(pady=5)
 
         # Выбор метода расчета
-        self.method_label = tk.Label(root, text="Select the calculation method:")
+        self.method_label = tk.Label(self.controls_frame, text="Select the calculation method:")
         self.method_label.pack(pady=5)
         self.method_var = tk.StringVar()
-        self.method_combo = ttk.Combobox(root, textvariable=self.method_var)
+        self.method_combo = ttk.Combobox(self.controls_frame, textvariable=self.method_var)
         self.method_combo['values'] = ('WLS', 'RLM')
         self.method_combo.current(0)
         self.method_combo.pack(pady=5)
 
         # Флаг расчета по линиям
         self.by_lines_var = tk.BooleanVar()
-        self.by_lines_check = tk.Checkbutton(root, text="Use Loops", variable=self.by_lines_var)
+        self.by_lines_check = tk.Checkbutton(self.controls_frame, text="Use Loops", variable=self.by_lines_var)
         self.by_lines_check.pack(pady=5)
 
         # Кнопка запуска расчета (Ties)
-        self.ties_button = tk.Button(root, text="Solve ties", command=self.calculate_ties)
+        self.ties_button = tk.Button(self.controls_frame, text="Solve ties", command=self.calculate_ties)
         self.ties_button.pack(pady=10)
 
         # Кнопка для расчета вертикального градиента
-        self.vg_button = tk.Button(root, text="Calculate vertical gradient", command=self.calculate_vg)
+        self.vg_button = tk.Button(self.controls_frame, text="Calculate vertical gradient", command=self.calculate_vg)
         self.vg_button.pack(pady=10)
 
-               # Таблица для отображения данных
-        self.table_frame = tk.Frame(root)
-        self.table_frame.pack(pady=10)
-        self.table = None  # Здесь будет EditableTable
-
-        self.data = None
-
-        # Поле для отчета с прокрутками
-        self.report_frame = tk.Frame(root)
-        self.report_frame.pack(fill="both", expand=True)
+        # Поле для отчета с прокрутками (внизу, на всю ширину)
+        self.report_frame = tk.Frame(self.main_frame)
+        self.report_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
 
         self.x_scrollbar = tk.Scrollbar(self.report_frame, orient="horizontal")
         self.x_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
@@ -80,6 +85,15 @@ class GravityApp:
 
         self.x_scrollbar.config(command=self.report_text.xview)
         self.y_scrollbar.config(command=self.report_text.yview)
+
+        self.table = None  # Здесь будет InputDataTable
+        self.data = None
+
+        # Настройка главного фрейма для адаптивного изменения размера
+        self.main_frame.grid_rowconfigure(0, weight=4)
+        self.main_frame.grid_rowconfigure(1, weight=1)
+        self.main_frame.grid_columnconfigure(0, weight=4)
+        self.main_frame.grid_columnconfigure(1, weight=4)
 
     def load_data_files(self):
         """Загрузка файлов данных и отображение в таблице"""
