@@ -6,7 +6,7 @@ from components.input_data_table import InputDataTable
 from grav_proc.loader import read_data, read_scale_factors
 from grav_proc.calculations import make_frame_to_proc, fit_by_meter_created
 from grav_proc.vertical_gradient import get_vg
-from grav_proc.plots import vg_plot
+from grav_proc.plots import vg_plot, residuals_plot, get_map
 from grav_proc.reports import get_report, make_vg_ties_report, make_vg_coeffs_report
 
 
@@ -58,8 +58,18 @@ class GravityApp:
 
         # Флаг расчета по линиям
         self.by_lines_var = tk.BooleanVar()
-        self.by_lines_check = tk.Checkbutton(self.controls_frame, text="Use Loops", variable=self.by_lines_var)
+        self.by_lines_check = tk.Checkbutton(self.controls_frame, text="Calc by lines", variable=self.by_lines_var)
         self.by_lines_check.pack(pady=5)
+
+        # Флажок для построения графиков остатков
+        self.plot_var = tk.BooleanVar()
+        self.plot_check = tk.Checkbutton(self.controls_frame, text="Plot residuals", variable=self.plot_var)
+        self.plot_check.pack(pady=5)
+
+        # Флажок для создания карты
+        self.map_var = tk.BooleanVar()
+        self.map_check = tk.Checkbutton(self.controls_frame, text="Create map", variable=self.map_var)
+        self.map_check.pack(pady=5)
 
         # Кнопка запуска расчета (Ties)
         self.ties_button = tk.Button(self.controls_frame, text="Solve ties", command=self.calculate_ties)
@@ -69,7 +79,7 @@ class GravityApp:
         self.vg_button = tk.Button(self.controls_frame, text="Calculate vertical gradient", command=self.calculate_vg)
         self.vg_button.pack(pady=10)
 
-        # Поле для отчета с прокрутками (внизу, на всю ширину)
+        # Поле для отчета с прокрутками
         self.report_frame = tk.Frame(self.main_frame)
         self.report_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
 
@@ -86,7 +96,7 @@ class GravityApp:
         self.x_scrollbar.config(command=self.report_text.xview)
         self.y_scrollbar.config(command=self.report_text.yview)
 
-        self.table = None  # Здесь будет InputDataTable
+        self.table = None
         self.data = None
 
         # Настройка главного фрейма для адаптивного изменения размера
@@ -137,6 +147,7 @@ class GravityApp:
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
         return result_dir
+
 
     def apply_scale_factors(self, raw_data, scale_factors_file):
         """Применение коэффициентов, если загружен файл"""
@@ -189,7 +200,20 @@ class GravityApp:
             self.report_text.delete(1.0, tk.END)
             self.report_text.insert(tk.END, report)
 
-            messagebox.showinfo("Successfully", f"The calculation of the ties is completed! The report is saved in {ties_report_file}")
+            # Проверка на необходимость построения графика остатков
+            if self.plot_var.get():
+                fig = residuals_plot(self.data)
+                fig.savefig(os.path.join(result_dir, f"{survey_name}_residuals.png"))
+                fig.show()
+
+            # Проверка на необходимость создания карты
+            if self.map_var.get():
+                fig_map = get_map(ties)
+                fig_map.savefig(os.path.join(result_dir, f"{survey_name}_map.pdf"), bbox_inches='tight')
+                fig_map.show()
+
+            messagebox.showinfo("Successfully",
+                                f"The calculation of the ties is completed! The report is saved in {ties_report_file}")
         except Exception as e:
             messagebox.showerror("Error", f"Error in calculating ties: {e}")
 

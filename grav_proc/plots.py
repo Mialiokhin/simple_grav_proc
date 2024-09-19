@@ -195,6 +195,7 @@ def vg_plot(coeffs, ties, by_meter=False):
         # Расчет ошибки по коэффициентам
         ua, ub = row.ua, row.ub
         cov = row.covab
+        #TODO Проверить правильность расчета ошибки
         u = abs(h_ref - y) * np.sqrt(ub ** 2 + (y + h_ref) ** 2 * ua ** 2 + 2 * (h_ref + y) * cov)
 
         x = gp(y)  # Корректированное значение VG

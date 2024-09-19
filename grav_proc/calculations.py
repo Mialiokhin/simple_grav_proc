@@ -727,7 +727,7 @@ def get_meter_ties_all(readings):
     return pd.DataFrame(lines)
 
 
-# Основная функция подбора привязок для конкретного прибора и его измерений
+# Основная функция расчета приращений для конкретного прибора и его измерений
 def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False):
     ties = pd.DataFrame()
     fix_station = anchor

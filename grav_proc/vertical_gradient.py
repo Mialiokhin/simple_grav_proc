@@ -25,7 +25,7 @@ def get_vg(readings, max_degree=2, vg_max_degree=2):
         'operator': [],           # Оператор
    }
 
-    # Группировка данных по номеру прибора и имени обследования
+    # Группировка данных по номеру прибора и имени съемки
     group_by_meter_and_survey = readings.groupby(['instrument_serial_number', 'survey_name'])
     for meter_survey, grouped_by_meter_and_survey in group_by_meter_and_survey:
         meter, survey = meter_survey
