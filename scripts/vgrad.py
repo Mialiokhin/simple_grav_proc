@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 import pandas as pd
 from grav_proc.vertical_gradient import get_vg
 from grav_proc.arguments import cli_vgrad_arguments, gui_vgrad_arguments
-from grav_proc.loader import read_data
+from grav_proc.loader import read_data, read_scale_factors
 from grav_proc.calculations import make_frame_to_proc
 from grav_proc.plots import vg_plot
 from grav_proc.reports import make_vg_ties_report, make_vg_coeffs_report
@@ -40,6 +40,25 @@ def main():
 
     # Преобразование сырых данных в формат, пригодный для дальнейшей обработки
     raw_data = make_frame_to_proc(read_data(args.input))
+
+    # Применение калибровочных коэффициентов, если они указаны
+    if args.scale_factors:
+        # Чтение калибровочных коэффициентов и применение их к данным
+        scale_factors = read_scale_factors(args.scale_factors)
+        group_by_meter = scale_factors.groupby('instrument_serial_number')  # Группировка данных по гравиметрам
+        for meter, meter_scale_factors in group_by_meter:
+            scale_factors = list(meter_scale_factors['scale_factor'])
+            scale_factors_std = list(meter_scale_factors['scale_factor'])
+            # Проверяем, если для гравиметра более одного коэффициента, выводим предупреждение
+            if len(scale_factors) > 1:
+                print('Warning: There is more than one scale factor for a current gravity meter!')
+            scale_factor = scale_factors[0]  # Используем первый коэффициент
+            scale_factor_std = scale_factors_std[0]
+            # Применяем калибровочный коэффициент к данным
+            raw_data.loc[raw_data['instrument_serial_number'] == meter, 'scale_factor'] = scale_factor
+            raw_data.loc[raw_data['instrument_serial_number'] == meter, 'scale_factor_std'] = scale_factor_std
+            raw_data.loc[raw_data['instrument_serial_number'] == meter, 'corr_grav'] = raw_data.loc[raw_data[
+                                                                                                        'instrument_serial_number'] == meter, 'corr_grav'] * scale_factor
 
     # Получаем расчетные данные вертикального градиента: привязки (ties) и коэффициенты (coefficients)
     vg_ties, vg_coef = get_vg(raw_data)
