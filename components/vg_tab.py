@@ -5,7 +5,7 @@ from grav_proc.vertical_gradient import get_vg
 from grav_proc.plots import vg_plot
 from grav_proc.reports import make_vg_ties_report, make_vg_coeffs_report
 from grav_proc.loader import read_scale_factors
-
+import pandas as pd
 
 class VGTab:
     def __init__(self, notebook, survey_data_tab):
@@ -69,18 +69,33 @@ class VGTab:
             # Расчет вертикального градиента
             vg_ties, vg_coef = get_vg(data)
 
-            # Генерация отчетов
-            make_vg_ties_report(vg_ties, os.path.join(result_dir, f"{survey_name}_vg_ties.csv"), verbose=True)
-            make_vg_coeffs_report(vg_coef, os.path.join(result_dir, f"{survey_name}_vg_coeffs.csv"), verbose=True)
+            # Генерация отчетов и сохранение их в файлы
+            ties_report_path = os.path.join(result_dir, f"{survey_name}_vg_ties.csv")
+            coeffs_report_path = os.path.join(result_dir, f"{survey_name}_vg_coeffs.csv")
+            make_vg_ties_report(vg_ties, ties_report_path, verbose=True)
+            make_vg_coeffs_report(vg_coef, coeffs_report_path, verbose=True)
+
+            # Фильтруем только нужные колонки для VG Ties отчета
+            vg_ties_filtered = vg_ties[
+                ['created_date', 'survey', 'operator', 'meter', 'line', 'from_point', 'to_point', 'from_height', 'to_height', 'gravity',
+                 'std_gravity']]
+            ties_report_md = vg_ties_filtered.to_markdown(index=False, tablefmt='grid', floatfmt='.3f')
+
+            # Фильтруем только нужные колонки для VG Coefficients отчета
+            vg_coef_filtered = vg_coef[['survey', 'a', 'b', 'ua', 'ub', 'covab']]
+            coeffs_report_md = vg_coef_filtered.to_markdown(index=False, tablefmt='grid', floatfmt='.3f')
+
+            # Очистка текстового поля и вывод отчетов
+            self.report_text_vg.delete(1.0, tk.END)
+            self.report_text_vg.insert(tk.END, "Vertical Gradient Ties Report:\n")
+            self.report_text_vg.insert(tk.END, ties_report_md)
+            self.report_text_vg.insert(tk.END, "\n\nVertical Gradient Coefficients Report:\n")
+            self.report_text_vg.insert(tk.END, coeffs_report_md)
 
             # Сохранение графиков
             figs = vg_plot(vg_coef, vg_ties)
             for fig, filename in figs:
                 fig.savefig(os.path.join(result_dir, f"{survey_name}_{filename}.png"))
-
-            # Выводим отчет
-            self.report_text_vg.delete(1.0, tk.END)
-            self.report_text_vg.insert(tk.END, "Vertical gradient calculation completed.")
 
             messagebox.showinfo("Successfully", f"Vertical gradient calculation completed!")
         except Exception as e:
