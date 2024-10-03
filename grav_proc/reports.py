@@ -123,11 +123,12 @@ def make_vg_ties_report(ties, output_file, verbose=False):
         'operator',  # Оператор
         'meter',  # Прибор
         'line',  # Линия
+        'from_point',  # Начальная точка
+        'to_point',  # Конечная точка
         'from_height',  # Высота начальной точки
         'to_height',  # Высота конечной точки
         'gravity',  # Значение гравитации
         'std_gravity',  # Стандартная ошибка для гравитации
-        'data_file'  # Имя файла данных
     ]
 
     # Заголовки для CSV файла
@@ -136,12 +137,13 @@ def make_vg_ties_report(ties, output_file, verbose=False):
         'station',  # Станция
         'observer',  # Наблюдатель
         'gravimeter',  # Гравиметр
-        'runn',  # Линия
+        'line',  # Линия
+        'from_point',  # Начальная точка
+        'to_point',  # Конечная точка
         'level_1',  # Высота 1
         'level_2',  # Высота 2
         'delta_g',  # Дельта гравитации
         'std',  # Ошибка
-        'source'  # Источник данных
     ]
 
     # Сохранение данных в CSV файл
