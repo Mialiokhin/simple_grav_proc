@@ -59,6 +59,14 @@ class VGTab:
         # Установка начальных позиций sash после инициализации интерфейса
         self.frame.after(100, self.set_initial_sash_positions)
 
+        # Создание контекстного меню для копирования
+        self.create_context_menu(self.report_text_vg_ties)
+        self.create_context_menu(self.report_text_vg_coeffs)
+
+        # Добавление поддержки Ctrl + C для копирования текста
+        self.bind_copy_shortcut(self.report_text_vg_ties)
+        self.bind_copy_shortcut(self.report_text_vg_coeffs)
+
     def set_initial_sash_positions(self):
         """Устанавливает начальные позиции sash для main и bottom PanedWindow."""
         self.set_main_paned_sash()
@@ -109,6 +117,21 @@ class VGTab:
                 sash_position = int(total_width * 0.75)
                 self.bottom_paned_window.sash_place(0, sash_position, 0)
             self.updating_bottom_sash = False
+
+    def create_context_menu(self, widget):
+        """Создание контекстного меню с командой копирования для заданного виджета."""
+        context_menu = tk.Menu(widget, tearoff=0)
+        context_menu.add_command(label="Copy", command=lambda: widget.event_generate("<<Copy>>"))
+
+        widget.bind("<Button-3>", lambda event: self.show_context_menu(event, context_menu))
+
+    def show_context_menu(self, event, context_menu):
+        """Отображает контекстное меню в позиции клика правой кнопки мыши."""
+        context_menu.tk_popup(event.x_root, event.y_root)
+
+    def bind_copy_shortcut(self, widget):
+        """Привязывает обработку Ctrl+C для копирования текста."""
+        widget.bind("<Control-c>", lambda event: widget.event_generate("<<Copy>>"))
 
     def apply_scale_factors(self, data):
         """Применение коэффициентов, если загружен файл"""
