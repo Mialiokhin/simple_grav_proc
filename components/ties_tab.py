@@ -1,11 +1,12 @@
 import os
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk, PanedWindow
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from grav_proc.calculations import fit_by_meter_created
 from grav_proc.reports import get_report
 from grav_proc.plots import residuals_plot, get_map
 from grav_proc.loader import read_scale_factors
-from tkinter import ttk
+
 
 class TiesTab:
     def __init__(self, notebook, survey_data_tab):
@@ -46,13 +47,38 @@ class TiesTab:
         self.ties_button = tk.Button(controls_frame, text="Solve ties", command=self.calculate_ties)
         self.ties_button.grid(row=5, column=0, padx=5, pady=10)
 
-        # Поле для отчета с прокрутками
-        self.report_text_ties = tk.Text(self.frame, height=10, wrap=tk.NONE)
-        self.report_text_ties.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        # Создаем PanedWindow для разделения окна пополам
+        self.main_paned_window = PanedWindow(self.frame, orient=tk.VERTICAL)
+        self.main_paned_window.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+
+        # Верхняя половина для отчета
+        self.report_text_ties = tk.Text(self.main_paned_window, height=10, wrap=tk.NONE)
+        self.create_context_menu(self.report_text_ties)
+        self.bind_copy_shortcut(self.report_text_ties)
+        self.main_paned_window.add(self.report_text_ties)  # Добавляем в PanedWindow
+
+        # Нижняя половина для графиков/карт (Notebook)
+        self.graphs_notebook = ttk.Notebook(self.main_paned_window)
+        self.main_paned_window.add(self.graphs_notebook)  # Добавляем в PanedWindow
 
         # Настройка адаптивного изменения размеров
         self.frame.grid_rowconfigure(1, weight=1)
         self.frame.grid_columnconfigure(0, weight=1)
+
+    def create_context_menu(self, widget):
+        """Создание контекстного меню с командой копирования для заданного виджета."""
+        context_menu = tk.Menu(widget, tearoff=0)
+        context_menu.add_command(label="Copy", command=lambda: widget.event_generate("<<Copy>>"))
+
+        widget.bind("<Button-3>", lambda event: self.show_context_menu(event, context_menu))
+
+    def show_context_menu(self, event, context_menu):
+        """Отображает контекстное меню в позиции клика правой кнопки мыши."""
+        context_menu.tk_popup(event.x_root, event.y_root)
+
+    def bind_copy_shortcut(self, widget):
+        """Привязывает обработку Ctrl+C для копирования текста."""
+        widget.bind("<Control-c>", lambda event: widget.event_generate("<<Copy>>"))
 
     def choose_output_directory(self, survey_name, task_name):
         """Функция для выбора папки сохранения и создания новой папки для результатов"""
@@ -112,21 +138,39 @@ class TiesTab:
             with open(report_file, 'w', encoding='utf-8') as f:
                 f.write(report)
 
-            # Выводим отчет
+            # Выводим отчет в текстовом поле
             self.report_text_ties.delete(1.0, tk.END)
             self.report_text_ties.insert(tk.END, report)
+
+            # Очистка вкладок с графиками перед их обновлением
+            for tab in self.graphs_notebook.tabs():
+                self.graphs_notebook.forget(tab)
 
             # Проверка на необходимость построения графика остатков
             if self.plot_var.get():
                 fig = residuals_plot(data)
+                # Сохраняем график остатков
                 fig.savefig(os.path.join(result_dir, f"{survey_name}_residuals.png"))
-                fig.show()
+
+                # Отображаем график в новом фрейме внутри Notebook
+                canvas_frame = tk.Frame(self.graphs_notebook)
+                canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
+                canvas.draw()
+                canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+                self.graphs_notebook.add(canvas_frame, text="Residuals")
 
             # Проверка на необходимость создания карты
             if self.map_var.get():
                 fig_map = get_map(ties)
+                # Сохраняем карту
                 fig_map.savefig(os.path.join(result_dir, f"{survey_name}_map.pdf"), bbox_inches='tight')
-                fig_map.show()
+
+                # Отображаем карту в новом фрейме внутри Notebook
+                canvas_frame = tk.Frame(self.graphs_notebook)
+                canvas_map = FigureCanvasTkAgg(fig_map, master=canvas_frame)
+                canvas_map.draw()
+                canvas_map.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+                self.graphs_notebook.add(canvas_frame, text="Map")
 
             messagebox.showinfo("Successfully", f"The calculation of the ties is completed!")
         except Exception as e:
