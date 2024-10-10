@@ -37,13 +37,16 @@ class InputDataTable:
             self.tree.heading(col, text=col)
             self.tree.column(col, anchor="w", width=100)
 
-        # Определяем, для какой колонки нужно форматировать данные
-        columns_to_format = ['corr_grav']  # Название колонки, где нужно применить округление
+            # Определяем, для каких колонок нужно форматировать данные
+        columns_to_format_1_decimal = ['instr_height', 'corr_grav', 'std_err']  # Колонки с 1 знаком после запятой
+        columns_to_format_9_decimals = ['lat', 'lon']  # Колонки с 9 знаками после запятой
 
-        # Добавляем данные с округлением для чисел с плавающей запятой только в нужной колонке
+        # Добавляем данные с правильным округлением для чисел с плавающей запятой
         for _, row in self.dataframe.iterrows():
             formatted_row = [
-                f'{val:.1f}' if col in columns_to_format and isinstance(val, float) else val
+                f'{val:.1f}' if col in columns_to_format_1_decimal and isinstance(val, float) else
+                f'{val:.9f}' if col in columns_to_format_9_decimals and isinstance(val, float) else
+                val
                 for col, val in zip(self.dataframe.columns, row)
             ]
             self.tree.insert("", "end", values=formatted_row)
