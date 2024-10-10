@@ -1,6 +1,5 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
-import pandas as pd
 
 class InputDataTable:
     def __init__(self, parent, dataframe):
@@ -24,10 +23,13 @@ class InputDataTable:
             self.h_scroll = ttk.Scrollbar(self.parent, orient="horizontal", command=self.tree.xview)
             self.tree.configure(yscrollcommand=self.v_scroll.set, xscrollcommand=self.h_scroll.set)
 
-            # Упаковываем виджеты
-            self.tree.pack(side="top", fill="both", expand=True)
-            self.v_scroll.pack(side="right", fill="y")
-            self.h_scroll.pack(side="bottom", fill="x")
+            # Размещаем элементы с правильной привязкой
+            self.tree.grid(row=0, column=0, sticky='nsew')  # Размещаем таблицу
+            self.v_scroll.grid(row=0, column=1, sticky='ns')  # Вертикальный скролл
+
+            # Настройка родительского фрейма для растягивания таблицы
+            self.parent.grid_rowconfigure(0, weight=1)
+            self.parent.grid_columnconfigure(0, weight=1)
 
         # Настройка колонок
         self.tree["columns"] = list(self.dataframe.columns)
