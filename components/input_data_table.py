@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+
 class InputDataTable:
     def __init__(self, parent, dataframe):
         self.parent = parent
@@ -8,6 +9,9 @@ class InputDataTable:
         self.tree = None  # Здесь будет таблица
         self.v_scroll = None  # Вертикальный скролл
         self.h_scroll = None  # Горизонтальный скролл
+
+        # Словарь для хранения цвета для каждой станции
+        self.station_colors = {}
 
         self.setup_table()
 
@@ -37,9 +41,12 @@ class InputDataTable:
             self.tree.heading(col, text=col)
             self.tree.column(col, anchor="w", width=100)
 
-            # Определяем, для каких колонок нужно форматировать данные
+        # Определяем, для каких колонок нужно форматировать данные
         columns_to_format_1_decimal = ['instr_height', 'corr_grav', 'std_err']  # Колонки с 1 знаком после запятой
         columns_to_format_9_decimals = ['lat', 'lon']  # Колонки с 9 знаками после запятой
+
+        # Цвета для станций (пастельные)
+        colors = ["#f0f8ff", "#e6e6fa", "#f5f5dc", "#f0fff0", "#fafad2", "#ffe4e1", "#ffe4b5"]
 
         # Добавляем данные с правильным округлением для чисел с плавающей запятой
         for _, row in self.dataframe.iterrows():
@@ -49,7 +56,20 @@ class InputDataTable:
                 val
                 for col, val in zip(self.dataframe.columns, row)
             ]
-            self.tree.insert("", "end", values=formatted_row)
+
+            # Получаем значение станции
+            station_value = row['station']
+
+            # Если станция еще не имеет цвета, назначаем ей один из цветов
+            if station_value not in self.station_colors:
+                self.station_colors[station_value] = colors[len(self.station_colors) % len(colors)]
+
+            # Назначаем тег с цветом для текущей строки
+            self.tree.insert("", "end", values=formatted_row, tags=(station_value,))
+
+        # Настройка тегов для изменения фона
+        for station, color in self.station_colors.items():
+            self.tree.tag_configure(station, background=color)
 
         # Привязываем события
         self.tree.bind("<Double-1>", self.on_double_click)
