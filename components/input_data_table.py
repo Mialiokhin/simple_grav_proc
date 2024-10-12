@@ -9,6 +9,7 @@ class InputDataTable:
         self.tree = None  # Здесь будет таблица
         self.v_scroll = None  # Вертикальный скролл
         self.h_scroll = None  # Горизонтальный скролл
+        self.entry_popup = None  # Поле для редактирования ячейки
 
         # Словарь для хранения цвета для каждой станции
         self.station_colors = {}
@@ -53,6 +54,9 @@ class InputDataTable:
         # Словарь для хранения номера строк по станциям
         station_row_numbers = {}
         current_station = None  # Переменная для отслеживания текущей станции
+
+        # Очищаем цвета станций
+        self.station_colors = {}
 
         # Добавляем данные с правильным округлением для чисел с плавающей запятой
         for _, row in self.dataframe.iterrows():
@@ -108,7 +112,7 @@ class InputDataTable:
             current_value = values[column_index]
 
             # Создаем поле для редактирования внутри таблицы
-            self.entry_popup = tk.Entry(self.tree, width=width)
+            self.entry_popup = tk.Entry(self.tree)
             self.entry_popup.place(x=x, y=y, width=width, height=height)
             self.entry_popup.insert(0, current_value)
             self.entry_popup.focus()
@@ -130,24 +134,33 @@ class InputDataTable:
 
             # Обновляем данные в DataFrame
             row_index = self.tree.index(row_id)
-            self.dataframe.iloc[row_index, column_index] = new_value
+            if column_index == 0:
+                pass  # Не обновляем номер строки
+            else:
+                df_col_index = column_index - 1  # Учитываем смещение из-за колонки "#"
+                col_name = self.dataframe.columns[df_col_index]
+                self.dataframe.at[row_index, col_name] = new_value
 
             # Закрываем поле редактирования
             self.entry_popup.destroy()
             self.entry_popup = None
 
     def delete_selected_rows(self, event=None):
-        """Удаление выделенных строк."""
+        """Удаление выделенных строк и обновление нумерации."""
         selected_items = self.tree.selection()
         if not selected_items:
             return
         confirm = messagebox.askyesno("Удаление", "Вы уверены, что хотите удалить выбранные строки?")
         if confirm:
-            for item in selected_items:
-                row_index = self.tree.index(item)
-                self.tree.delete(item)
-                # Удаляем строку из DataFrame
-                self.dataframe.drop(self.dataframe.index[row_index], inplace=True)
+            # Получаем индексы удаляемых строк
+            indices_to_delete = [self.tree.index(item) for item in selected_items]
+
+            # Удаляем строки из DataFrame
+            self.dataframe.drop(self.dataframe.index[indices_to_delete], inplace=True)
+            self.dataframe.reset_index(drop=True, inplace=True)  # Сброс индексов
+
+            # Очищаем дерево и пересоздаем таблицу
+            self.setup_table()
 
     def get_dataframe(self):
         """Возвращаем DataFrame с изменениями."""
