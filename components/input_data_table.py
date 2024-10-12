@@ -30,14 +30,16 @@ class InputDataTable:
             # Размещаем элементы с правильной привязкой
             self.tree.grid(row=0, column=0, sticky='nsew')  # Размещаем таблицу
             self.v_scroll.grid(row=0, column=1, sticky='ns')  # Вертикальный скролл
+            self.h_scroll.grid(row=1, column=0, sticky='ew')  # Горизонтальный скролл
 
             # Настройка родительского фрейма для растягивания таблицы
             self.parent.grid_rowconfigure(0, weight=1)
             self.parent.grid_columnconfigure(0, weight=1)
 
         # Настройка колонок
-        self.tree["columns"] = list(self.dataframe.columns)
-        for col in self.dataframe.columns:
+        columns = ["#", *list(self.dataframe.columns)]  # Добавляем колонку для нумерации
+        self.tree["columns"] = columns
+        for col in columns:
             self.tree.heading(col, text=col)
             self.tree.column(col, anchor="w", width=100)
 
@@ -48,8 +50,22 @@ class InputDataTable:
         # Цвета для станций (пастельные)
         colors = ["#f0f8ff", "#e6e6fa", "#f5f5dc", "#f0fff0", "#fafad2", "#ffe4e1", "#ffe4b5"]
 
+        # Словарь для хранения номера строк по станциям
+        station_row_numbers = {}
+        current_station = None  # Переменная для отслеживания текущей станции
+
         # Добавляем данные с правильным округлением для чисел с плавающей запятой
         for _, row in self.dataframe.iterrows():
+            station_value = row['station']
+
+            # Если станция изменилась, сбрасываем нумерацию
+            if station_value != current_station:
+                station_row_numbers[station_value] = 1
+                current_station = station_value
+            else:
+                station_row_numbers[station_value] += 1
+
+            # Форматирование строки
             formatted_row = [
                 f'{val:.1f}' if col in columns_to_format_1_decimal and isinstance(val, float) else
                 f'{val:.9f}' if col in columns_to_format_9_decimals and isinstance(val, float) else
@@ -57,15 +73,15 @@ class InputDataTable:
                 for col, val in zip(self.dataframe.columns, row)
             ]
 
-            # Получаем значение станции
-            station_value = row['station']
+            # Добавляем номер строки как первый элемент
+            row_with_number = [station_row_numbers[station_value], *formatted_row]
 
             # Если станция еще не имеет цвета, назначаем ей один из цветов
             if station_value not in self.station_colors:
                 self.station_colors[station_value] = colors[len(self.station_colors) % len(colors)]
 
             # Назначаем тег с цветом для текущей строки
-            self.tree.insert("", "end", values=formatted_row, tags=(station_value,))
+            self.tree.insert("", "end", values=row_with_number, tags=(station_value,))
 
         # Настройка тегов для изменения фона
         for station, color in self.station_colors.items():
