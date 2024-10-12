@@ -51,23 +51,25 @@ class InputDataTable:
         # Цвета для станций (пастельные)
         colors = ["#f0f8ff", "#e6e6fa", "#f5f5dc", "#f0fff0", "#fafad2", "#ffe4e1", "#ffe4b5"]
 
-        # Словарь для хранения номера строк по станциям
-        station_row_numbers = {}
-        current_station = None  # Переменная для отслеживания текущей станции
+        # Словарь для хранения номера строк по комбинации линии и станции
+        group_row_numbers = {}
+        current_group_key = None  # Переменная для отслеживания текущей группы (линия, станция)
 
         # Очищаем цвета станций
         self.station_colors = {}
 
         # Добавляем данные с правильным округлением для чисел с плавающей запятой
         for _, row in self.dataframe.iterrows():
+            line_value = row['line']
             station_value = row['station']
+            group_key = (line_value, station_value)
 
-            # Если станция изменилась, сбрасываем нумерацию
-            if station_value != current_station:
-                station_row_numbers[station_value] = 1
-                current_station = station_value
+            # Если линия или станция изменилась, сбрасываем нумерацию
+            if group_key != current_group_key:
+                group_row_numbers[group_key] = 1
+                current_group_key = group_key
             else:
-                station_row_numbers[station_value] += 1
+                group_row_numbers[group_key] += 1
 
             # Форматирование строки
             formatted_row = [
@@ -78,7 +80,7 @@ class InputDataTable:
             ]
 
             # Добавляем номер строки как первый элемент
-            row_with_number = [station_row_numbers[station_value], *formatted_row]
+            row_with_number = [group_row_numbers[group_key], *formatted_row]
 
             # Если станция еще не имеет цвета, назначаем ей один из цветов
             if station_value not in self.station_colors:
@@ -140,6 +142,12 @@ class InputDataTable:
                 df_col_index = column_index - 1  # Учитываем смещение из-за колонки "#"
                 col_name = self.dataframe.columns[df_col_index]
                 self.dataframe.at[row_index, col_name] = new_value
+
+                # Если изменили 'line' или 'station', обновляем таблицу
+                if col_name in ['line', 'station']:
+                    self.dataframe.reset_index(drop=True, inplace=True)
+                    self.setup_table()
+                    return  # Уже обновили, выходим из функции
 
             # Закрываем поле редактирования
             self.entry_popup.destroy()
