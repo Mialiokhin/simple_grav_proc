@@ -24,6 +24,21 @@ class GravityApp:
         self.notebook.add(self.ties_tab.frame, text="Ties")
         self.notebook.add(self.vg_tab.frame, text="Vertical Gradient")
 
+        # Обработка события закрытия окна
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def on_closing(self):
+        # Вызываем методы on_closing у вкладок, если они существуют
+        if hasattr(self.ties_tab, 'on_closing'):
+            self.ties_tab.on_closing()
+        if hasattr(self.vg_tab, 'on_closing'):
+            self.vg_tab.on_closing()
+        if hasattr(self.survey_data_tab, 'on_closing'):
+            self.survey_data_tab.on_closing()
+
+        # Закрываем главное окно
+        self.root.destroy()
+
 
 if __name__ == "__main__":
     root = tk.Tk()
