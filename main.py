@@ -36,6 +36,9 @@ class GravityApp:
         if hasattr(self.survey_data_tab, 'on_closing'):
             self.survey_data_tab.on_closing()
 
+        # Остановка цикла обработки событий
+        self.root.quit()
+
         # Закрываем главное окно
         self.root.destroy()
 
