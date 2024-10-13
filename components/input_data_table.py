@@ -141,10 +141,20 @@ class InputDataTable:
             else:
                 df_col_index = column_index - 1  # Учитываем смещение из-за колонки "#"
                 col_name = self.dataframe.columns[df_col_index]
+
+                # Приведение типов данных
+                if self.dataframe[col_name].dtype == 'float64':
+                    new_value = float(new_value)
+                elif self.dataframe[col_name].dtype == 'int64':
+                    new_value = int(new_value)
+
                 self.dataframe.at[row_index, col_name] = new_value
 
                 # Если изменили 'line' или 'station', обновляем таблицу
                 if col_name in ['line', 'station']:
+                    self.entry_popup.destroy()
+                    self.entry_popup = None
+
                     self.dataframe.reset_index(drop=True, inplace=True)
                     self.setup_table()
                     return  # Уже обновили, выходим из функции
