@@ -293,6 +293,7 @@ def cg6_reader(data_files):
             raise ImportError(f'{data_file.name} data file must be in {meter_type.upper()} format')
 
         lines = data_file.readlines()
+        lines = [line.replace(",", ".") for line in lines]
         data_file.close()
 
         row = {}

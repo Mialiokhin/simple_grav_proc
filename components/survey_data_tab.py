@@ -3,6 +3,7 @@ from tkinter import filedialog
 from components.input_data_table import InputDataTable
 from grav_proc.loader import read_data
 from grav_proc.calculations import make_frame_to_proc
+import pandas as pd
 
 
 class SurveyDataTab:
@@ -37,6 +38,10 @@ class SurveyDataTab:
         self.coeff_files_button = tk.Button(controls_frame, text="Import", command=self.load_coeff_files)
         self.coeff_files_button.pack(pady=5)
 
+        # Добавляем кнопку "Use GRS2"
+        self.use_grs2_button = tk.Button(controls_frame, text="Use GRS2", command=self.use_grs2)
+        self.use_grs2_button.pack(pady=5)
+
         # Настройка адаптивного изменения размеров
         self.frame.grid_rowconfigure(0, weight=1)
         self.frame.grid_columnconfigure(0, weight=1)
@@ -62,6 +67,62 @@ class SurveyDataTab:
 
         # Отображаем данные в таблице
         self.table = InputDataTable(self.table_frame, self.data)
+
+    def use_grs2(self):
+        """Обработка данных в соответствии с требованиями GRS2"""
+        if self.data is not None:
+            self.data = self.process_grs2_data(self.data)
+            # Обновляем отображение таблицы
+            if self.table:
+                self.table.update_data(self.data)
+
+    def process_grs2_data(self, df):
+        """Обработка DataFrame для приведения к программе измерений ГРС2"""
+        df = df.copy()
+        station_count = 1
+        line_count = 1
+        survey_count = 0
+        station_name = df.iloc[0]['station']
+        instrument = df.iloc[0]['instrument_serial_number']
+        df['line'] = 0  # Инициализируем колонку 'Line'
+
+        processed_rows = []
+        temp_rows = []
+
+        for idx, row in df.iterrows():
+            current_station = row['station']
+            current_instrument = row['instrument_serial_number']
+            if current_instrument != instrument:
+                station_count = 1
+                instrument = row['instrument_serial_number']
+                line_count += 1
+                station_name = row['station']
+            if current_station == station_name:
+                survey_count += 1
+                row['line'] = line_count
+                temp_rows.append(row.copy())
+                processed_rows.append(row.copy())
+            else:
+                station_count += 1
+                if station_count == 5 or station_count == 8:
+                    line_count += 1
+                    # Дублируем последние survey_count строк
+                    for temp_row in temp_rows[-survey_count:]:
+                        duplicated_row = temp_row.copy()
+                        duplicated_row['line'] = line_count
+                        processed_rows.append(duplicated_row)
+
+                # Обновляем station_name и сбрасываем survey_count
+                station_name = current_station
+                survey_count = 1
+                row['line'] = line_count
+                temp_rows.append(row.copy())
+                processed_rows.append(row.copy())
+
+        df_processed = pd.DataFrame(processed_rows)
+        df_processed.reset_index(drop=True, inplace=True)
+
+        return df_processed
 
     def load_coeff_files(self):
         """Загрузка файлов коэффициентов"""

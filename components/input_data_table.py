@@ -97,9 +97,14 @@ class InputDataTable:
         self.tree.bind("<Double-1>", self.on_double_click)
         self.tree.bind("<Delete>", self.delete_selected_rows)
 
+    def update_data(self, dataframe):
+        """Обновление таблицы с новыми данными."""
+        self.dataframe = dataframe.copy()
+        self.setup_table()
+
     def on_double_click(self, event):
         """Редактирование значения ячейки прямо в таблице."""
-        # Получаем номер столбца и строки
+        # Получаем номер колонки и строки
         region = self.tree.identify_region(event.x, event.y)
         if region == "cell":
             row_id = self.tree.identify_row(event.y)
@@ -119,63 +124,65 @@ class InputDataTable:
             self.entry_popup.insert(0, current_value)
             self.entry_popup.focus()
 
-            # Сохраняем изменения при нажатии Enter
+            # Сохраняем изменения по нажатию Enter
             self.entry_popup.bind("<Return>", lambda e: self.save_value(row_id, column_index))
             # Закрываем поле и сохраняем данные при потере фокуса
             self.entry_popup.bind("<FocusOut>", lambda e: self.save_value(row_id, column_index))
 
     def save_value(self, row_id, column_index):
-        """Сохранение значения ячейки при нажатии Enter или потере фокуса."""
+        """Сохраняем значение ячейки по нажатию Enter или потере фокуса."""
         if self.entry_popup:
             new_value = self.entry_popup.get()
             current_values = list(self.tree.item(row_id, "values"))
             current_values[column_index] = new_value
 
-            # Обновляем данные в дереве
+            # Обновляем данные в таблице
             self.tree.item(row_id, values=current_values)
 
-            # Обновляем данные в DataFrame
+            # Обновляем DataFrame
             row_index = self.tree.index(row_id)
             if column_index == 0:
                 pass  # Не обновляем номер строки
             else:
-                df_col_index = column_index - 1  # Учитываем смещение из-за колонки "#"
+                df_col_index = column_index - 1  # Смещение из-за колонки "#"
                 col_name = self.dataframe.columns[df_col_index]
 
-                # Приведение типов данных
-                if self.dataframe[col_name].dtype == 'float64':
+                # Приведение типов
+                if self.dataframe[col_name].dtype == "float64":
                     new_value = float(new_value)
-                elif self.dataframe[col_name].dtype == 'int64':
+                elif self.dataframe[col_name].dtype == "int64":
                     new_value = int(new_value)
 
                 self.dataframe.at[row_index, col_name] = new_value
 
-                # Если изменили 'line' или 'station', обновляем таблицу
-                if col_name in ['line', 'station']:
+                # Если 'line' или 'station' изменились, обновляем таблицу
+                if col_name in ["line", "station"]:
                     self.entry_popup.destroy()
                     self.entry_popup = None
 
                     self.dataframe.reset_index(drop=True, inplace=True)
                     self.setup_table()
-                    return  # Уже обновили, выходим из функции
+                    return  # Уже обновлено, выходим из функции
 
             # Закрываем поле редактирования
             self.entry_popup.destroy()
             self.entry_popup = None
 
     def delete_selected_rows(self, event=None):
-        """Удаление выделенных строк и обновление нумерации."""
+        """Удаление выбранных строк и обновление нумерации."""
         selected_items = self.tree.selection()
         if not selected_items:
             return
-        confirm = messagebox.askyesno("Удаление", "Вы уверены, что хотите удалить выбранные строки?")
+        confirm = messagebox.askyesno(
+            "Удаление", "Вы уверены, что хотите удалить выбранные строки?"
+        )
         if confirm:
-            # Получаем индексы удаляемых строк
+            # Получаем индексы строк для удаления
             indices_to_delete = [self.tree.index(item) for item in selected_items]
 
             # Удаляем строки из DataFrame
             self.dataframe.drop(self.dataframe.index[indices_to_delete], inplace=True)
-            self.dataframe.reset_index(drop=True, inplace=True)  # Сброс индексов
+            self.dataframe.reset_index(drop=True, inplace=True)  # Сбрасываем индексы
 
             # Очищаем дерево и пересоздаем таблицу
             self.setup_table()
