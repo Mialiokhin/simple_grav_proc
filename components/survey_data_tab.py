@@ -63,6 +63,28 @@ class SurveyDataTab:
         self.rename_button = tk.Button(controls_frame, text="Rename", command=self.rename_station)
         self.rename_button.pack(pady=5)
 
+        # Добавляем раздел для редактирования координат станций
+        self.edit_coords_label = tk.Label(controls_frame, text="Editing coordinates:")
+        self.edit_coords_label.pack(pady=5)
+
+        # Поля для ввода новых координат
+        self.lat_label = tk.Label(controls_frame, text="Latitude:")
+        self.lat_label.pack(pady=5)
+        self.lat_entry = tk.Entry(controls_frame, width=30)
+        self.lat_entry.pack(pady=5)
+
+        self.lon_label = tk.Label(controls_frame, text="Longitude:")
+        self.lon_label.pack(pady=5)
+        self.lon_entry = tk.Entry(controls_frame, width=30)
+        self.lon_entry.pack(pady=5)
+
+        # Кнопка для сохранения изменений координат
+        self.save_coords_button = tk.Button(controls_frame, text="Save coordinates", command=self.save_station_coords)
+        self.save_coords_button.pack(pady=5)
+
+        # Привязываем событие на выбор станции в Listbox
+        self.station_listbox.bind('<<ListboxSelect>>', self.on_station_select)
+
         # Настройка адаптивного изменения размеров
         self.frame.grid_rowconfigure(0, weight=1)
         self.frame.grid_columnconfigure(0, weight=1)
@@ -216,3 +238,38 @@ class SurveyDataTab:
             # Получаем актуальные данные из таблицы
             return self.table.get_dataframe()
         return self.data  # Возвращаем исходные данные, если таблица еще не создана
+
+    def on_station_select(self, event):
+        """Обработчик выбора станции в Listbox"""
+        selected_index = self.station_listbox.curselection()
+        if selected_index:
+            station_name = self.station_listbox.get(selected_index)
+            # Получаем текущие координаты для этой станции
+            station_data = self.data[self.data['station'] == station_name]
+            if not station_data.empty:
+                lat = station_data.iloc[0]['lat']
+                lon = station_data.iloc[0]['lon']
+                # Заполняем поля ввода координат
+                self.lat_entry.delete(0, tk.END)
+                self.lat_entry.insert(0, str(lat))
+                self.lon_entry.delete(0, tk.END)
+                self.lon_entry.insert(0, str(lon))
+
+    def save_station_coords(self):
+        """Сохранение измененных координат станции"""
+        selected_index = self.station_listbox.curselection()
+        if selected_index:
+            station_name = self.station_listbox.get(selected_index)
+            try:
+                new_lat = float(self.lat_entry.get().replace(",", "."))
+                new_lon = float(self.lon_entry.get().replace(",", "."))
+                # Обновляем lat и lon в данных
+                self.data.loc[self.data['station'] == station_name, 'lat'] = new_lat
+                self.data.loc[self.data['station'] == station_name, 'lon'] = new_lon
+                # Обновляем отображение таблицы
+                self.table.update_data(self.data)
+                tk.messagebox.showinfo("Информация", "Координаты станции успешно обновлены.")
+            except ValueError:
+                tk.messagebox.showwarning("Предупреждение", "Пожалуйста, введите корректные числовые значения для координат.")
+        else:
+            tk.messagebox.showwarning("Предупреждение", "Пожалуйста, выберите станцию для изменения координат.")
