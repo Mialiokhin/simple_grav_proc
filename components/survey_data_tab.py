@@ -42,6 +42,22 @@ class SurveyDataTab:
         self.use_grs2_button = tk.Button(controls_frame, text="Use GRS2", command=self.use_grs2)
         self.use_grs2_button.pack(pady=5)
 
+        # Добавляем раздел для переименования станций
+        self.rename_label = tk.Label(controls_frame, text="Rename Stations:")
+        self.rename_label.pack(pady=5)
+
+        # Создаем Listbox для отображения уникальных станций
+        self.station_listbox = tk.Listbox(controls_frame, selectmode=tk.SINGLE, exportselection=False)
+        self.station_listbox.pack(pady=5)
+
+        # Поле для ввода нового имени станции
+        self.new_name_entry = tk.Entry(controls_frame, width=30)
+        self.new_name_entry.pack(pady=5)
+
+        # Кнопка для переименования станции
+        self.rename_button = tk.Button(controls_frame, text="Rename", command=self.rename_station)
+        self.rename_button.pack(pady=5)
+
         # Настройка адаптивного изменения размеров
         self.frame.grid_rowconfigure(0, weight=1)
         self.frame.grid_columnconfigure(0, weight=1)
@@ -68,6 +84,40 @@ class SurveyDataTab:
         # Отображаем данные в таблице
         self.table = InputDataTable(self.table_frame, self.data)
 
+        # Обновляем список уникальных станций в Listbox
+        self.update_station_listbox()
+
+    def update_station_listbox(self):
+        """Обновление списка уникальных станций в Listbox"""
+        if self.data is not None:
+            # Получаем уникальные названия станций
+            unique_stations = sorted(self.data['station'].unique())
+            # Очищаем Listbox
+            self.station_listbox.delete(0, tk.END)
+            # Заполняем Listbox уникальными названиями станций
+            for station in unique_stations:
+                self.station_listbox.insert(tk.END, station)
+
+    def rename_station(self):
+        """Переименование выбранной станции"""
+        selected_index = self.station_listbox.curselection()
+        if selected_index:
+            old_name = self.station_listbox.get(selected_index)
+            new_name = self.new_name_entry.get().strip()
+            if new_name:
+                # Заменяем название станции в данных
+                self.data.loc[self.data['station'] == old_name, 'station'] = new_name
+                # Обновляем таблицу
+                self.table.update_data(self.data)
+                # Обновляем Listbox станций
+                self.update_station_listbox()
+                # Очищаем поле ввода
+                self.new_name_entry.delete(0, tk.END)
+            else:
+                tk.messagebox.showwarning("Warning", "Please enter a new station name.")
+        else:
+            tk.messagebox.showwarning("Warning", "Please select a station to rename.")
+
     def use_grs2(self):
         """Обработка данных в соответствии с требованиями GRS2"""
         if self.data is not None:
@@ -84,6 +134,7 @@ class SurveyDataTab:
         survey_count = 0
         station_name = df.iloc[0]['station']
         instrument = df.iloc[0]['instrument_serial_number']
+        created = df.iloc[0]['created']
         df['line'] = 0  # Инициализируем колонку 'Line'
 
         processed_rows = []
@@ -92,9 +143,11 @@ class SurveyDataTab:
         for idx, row in df.iterrows():
             current_station = row['station']
             current_instrument = row['instrument_serial_number']
-            if current_instrument != instrument:
+            current_created = row['created']
+            if current_instrument != instrument or current_created != created:
                 station_count = 1
                 instrument = row['instrument_serial_number']
+                created = row['created']
                 line_count += 1
                 station_name = row['station']
             if current_station == station_name:
