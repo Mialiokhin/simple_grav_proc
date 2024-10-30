@@ -3,6 +3,7 @@ from tkinter import filedialog
 from components.input_data_table import InputDataTable
 from grav_proc.loader import read_data
 from grav_proc.calculations import make_frame_to_proc
+from grav_proc.tidal import TIDEFF
 import pandas as pd
 
 
@@ -41,6 +42,10 @@ class SurveyDataTab:
         # Добавляем кнопку "Use GRS2"
         self.use_grs2_button = tk.Button(controls_frame, text="Use GRS2", command=self.use_grs2)
         self.use_grs2_button.pack(pady=5)
+
+        # Добавляем кнопку для расчёта приливных поправок
+        self.calc_tide_button = tk.Button(controls_frame, text="Calc Tide", command=self.calculate_tidal_correction)
+        self.calc_tide_button.pack(pady=5)
 
         # Добавляем раздел для переименования станций
         self.rename_label = tk.Label(controls_frame, text="Rename Stations:")
@@ -117,6 +122,25 @@ class SurveyDataTab:
                 tk.messagebox.showwarning("Warning", "Please enter a new station name.")
         else:
             tk.messagebox.showwarning("Warning", "Please select a station to rename.")
+
+    def calculate_tidal_correction(self):
+        """Расчет и применение приливных поправок"""
+        if self.data is not None:
+            # Пробегаем по каждой строке и вычисляем приливную поправку
+            for idx, row in self.data.iterrows():
+                lat = row['lat']
+                lon = row['lon']
+                date = pd.to_datetime(row['date_time'])
+
+                # Рассчитываем новую приливную поправку с использованием функции TIDEFF
+                new_tide_corr = TIDEFF(lat, lon, date.day, date.month, date.year, date.hour, date.minute)
+
+                # Обновляем значение в колонке 'tide_corr'
+                self.data.at[idx, 'corr_grav'] = row['corr_grav'] - row['tide_corr'] + new_tide_corr
+                self.data.at[idx, 'tide_corr'] = round(new_tide_corr, 4)
+
+            # Обновляем отображение таблицы
+            self.table.update_data(self.data)
 
     def use_grs2(self):
         """Обработка данных в соответствии с требованиями GRS2"""
