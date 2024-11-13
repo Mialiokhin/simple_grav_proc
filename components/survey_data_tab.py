@@ -16,6 +16,17 @@ class SurveyDataTab:
         self.table = None
         self.data = None
 
+        # Хранение текущих значений выбранной станции и серии
+        self.current_station_name = None
+        self.current_station_lat = None
+        self.current_station_lon = None
+
+        self.current_series_id = None
+        self.current_series_station_name = None
+        self.current_series_lat = None
+        self.current_series_lon = None
+        self.current_series_pressure = None
+
         # Левый фрейм для таблицы
         self.table_frame = tk.Frame(self.frame)
         self.table_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
@@ -143,30 +154,18 @@ class SurveyDataTab:
         self.series_station_entry = tk.Entry(self.edit_series_frame, width=30)
         self.series_station_entry.pack(pady=2)
 
+        # Добавление поля для ввода атмосферного давления
+        self.pressure_label = tk.Label(self.edit_series_frame, text="Atmospheric Pressure (hPa):")
+        self.pressure_label.pack(pady=5)
+        self.pressure_entry = tk.Entry(self.edit_series_frame, width=30)
+        self.pressure_entry.pack(pady=5)
+
         # Объединённая кнопка сохранения для серий
         self.save_series_changes_button = tk.Button(
             self.edit_series_frame, text="Save Changes",
             command=self.save_series_changes
         )
         self.save_series_changes_button.pack(pady=5)
-
-        # Раздел для ввода и сохранения атмосферного давления
-        self.pressure_frame = tk.Frame(controls_frame)
-        # Изначально скрываем, показываем только в режиме edit_series
-        self.pressure_frame.pack(pady=10, fill='x')
-        self.pressure_frame.pack_forget()  # Скрываем при инициализации
-
-        self.pressure_label = tk.Label(self.pressure_frame, text="Atmospheric Pressure (hPa):")
-        self.pressure_label.pack(pady=5)
-        self.pressure_entry = tk.Entry(self.pressure_frame, width=30)
-        self.pressure_entry.pack(pady=5)
-
-        # Объединённая кнопка сохранения для давления
-        self.save_pressure_changes_button = tk.Button(
-            self.pressure_frame, text="Save Changes",
-            command=self.save_pressure_changes
-        )
-        self.save_pressure_changes_button.pack(pady=5)
 
         # Настройка адаптивного изменения размеров
         self.frame.grid_rowconfigure(0, weight=1)
@@ -178,11 +177,9 @@ class SurveyDataTab:
         if mode == "edit_station":
             self.edit_station_frame.pack(pady=5)
             self.edit_series_frame.pack_forget()
-            self.pressure_frame.pack_forget()
         elif mode == "edit_series":
             self.edit_station_frame.pack_forget()
             self.edit_series_frame.pack(pady=5)
-            self.pressure_frame.pack(pady=10, fill='x')
 
     def load_data_files(self):
         """Загрузка файлов данных и отображение в таблице"""
@@ -269,127 +266,153 @@ class SurveyDataTab:
         if selected_index:
             station_name = self.station_listbox.get(selected_index)
             new_name = self.rename_station_entry.get().strip()
-            try:
-                new_lat = float(self.station_lat_entry.get().replace(",", "."))
-                new_lon = float(self.station_lon_entry.get().replace(",", "."))
-            except ValueError:
-                messagebox.showwarning("Предупреждение",
-                                       "Пожалуйста, введите корректные числовые значения для координат.")
-                return
+            new_lat_str = self.station_lat_entry.get().strip()
+            new_lon_str = self.station_lon_entry.get().strip()
 
-            if not new_name:
-                messagebox.showwarning("Предупреждение", "Пожалуйста, введите новое название станции.")
-                return
+            changes_made = False  # Флаг, указывающий на наличие изменений
 
-            # Обновляем название станции
-            self.data.loc[self.data['station'] == station_name, 'station'] = new_name
+            # Проверяем и обновляем название станции, если введено новое имя и оно отличается
+            if new_name and new_name != station_name:
+                self.data.loc[self.data['station'] == station_name, 'station'] = new_name
+                changes_made = True
 
-            # Обновляем координаты станции
-            self.data.loc[self.data['station'] == new_name, 'lat'] = new_lat
-            self.data.loc[self.data['station'] == new_name, 'lon'] = new_lon
+            # Проверяем и обновляем широту, если введено новое значение и оно отличается
+            if new_lat_str:
+                try:
+                    new_lat = float(new_lat_str.replace(",", "."))
+                    current_lat = self.data.loc[self.data['station'] == new_name if new_name else station_name, 'lat'].iloc[0]
+                    if new_lat != current_lat:
+                        self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lat'] = new_lat
+                        changes_made = True
+                except ValueError:
+                    messagebox.showwarning("Предупреждение",
+                                           "Пожалуйста, введите корректное числовое значение для широты.")
+                    return
 
-            # Обновляем отображение таблицы
-            self.table.update_data(self.data)
+            # Проверяем и обновляем долготу, если введено новое значение и оно отличается
+            if new_lon_str:
+                try:
+                    new_lon = float(new_lon_str.replace(",", "."))
+                    current_lon = self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'].iloc[0]
+                    if new_lon != current_lon:
+                        self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'] = new_lon
+                        changes_made = True
+                except ValueError:
+                    messagebox.showwarning("Предупреждение",
+                                           "Пожалуйста, введите корректное числовое значение для долготы.")
+                    return
 
-            # Обновляем списки
-            self.update_station_listbox()
-            self.update_series_listbox()
+            if changes_made:
+                # Обновляем отображение таблицы
+                self.table.update_data(self.data)
 
-            # Очищаем поля ввода
-            self.rename_station_entry.delete(0, tk.END)
-            self.station_lat_entry.delete(0, tk.END)
-            self.station_lon_entry.delete(0, tk.END)
+                # Обновляем списки
+                self.update_station_listbox()
+                self.update_series_listbox()
 
-            messagebox.showinfo("Информация", f"Станция '{station_name}' успешно обновлена.")
+                # Очищаем поля ввода
+                self.rename_station_entry.delete(0, tk.END)
+                self.station_lat_entry.delete(0, tk.END)
+                self.station_lon_entry.delete(0, tk.END)
+
+                messagebox.showinfo("Информация", f"Станция '{station_name}' успешно обновлена.")
+            else:
+                messagebox.showinfo("Информация", "Нет изменений для сохранения.")
         else:
             messagebox.showwarning("Предупреждение", "Пожалуйста, выберите станцию для изменения.")
 
     def save_series_changes(self):
-        """Сохранение изменений серии: переименование станции и координат"""
+        """Сохранение изменений серии: переименование станции, координат и давления"""
         selected_index = self.series_listbox.curselection()
         if selected_index:
             series_id = self.data['series_id'].unique()[selected_index[0]]
             new_station_name = self.series_station_entry.get().strip()
-            try:
-                new_lat = float(self.series_lat_entry.get().replace(",", "."))
-                new_lon = float(self.series_lon_entry.get().replace(",", "."))
-            except ValueError:
-                messagebox.showwarning("Предупреждение",
-                                       "Пожалуйста, введите корректные числовые значения для координат.")
-                return
+            new_lat_str = self.series_lat_entry.get().strip()
+            new_lon_str = self.series_lon_entry.get().strip()
+            new_pressure_str = self.pressure_entry.get().strip()
 
-            if not new_station_name:
-                messagebox.showwarning("Предупреждение", "Пожалуйста, введите новое название станции.")
-                return
+            changes_made = False  # Флаг, указывающий на наличие изменений
 
-            # Обновляем название станции в данных для выбранной серии
-            self.data.loc[self.data['series_id'] == series_id, 'station'] = new_station_name
+            # Проверяем и обновляем название станции, если введено новое имя и оно отличается
+            if new_station_name and new_station_name != self.data.loc[self.data['series_id'] == series_id, 'station'].iloc[0]:
+                self.data.loc[self.data['series_id'] == series_id, 'station'] = new_station_name
+                changes_made = True
 
-            # Обновляем координаты серии
-            self.data.loc[self.data['series_id'] == series_id, 'lat'] = new_lat
-            self.data.loc[self.data['series_id'] == series_id, 'lon'] = new_lon
+            # Проверяем и обновляем широту, если введено новое значение и оно отличается
+            if new_lat_str:
+                try:
+                    new_lat = float(new_lat_str.replace(",", "."))
+                    current_lat = self.data.loc[self.data['series_id'] == series_id, 'lat'].iloc[0]
+                    if new_lat != current_lat:
+                        self.data.loc[self.data['series_id'] == series_id, 'lat'] = new_lat
+                        changes_made = True
+                except ValueError:
+                    messagebox.showwarning("Предупреждение",
+                                           "Пожалуйста, введите корректное числовое значение для широты.")
+                    return
 
-            # Обновляем отображение таблицы
-            self.table.update_data(self.data)
+            # Проверяем и обновляем долготу, если введено новое значение и оно отличается
+            if new_lon_str:
+                try:
+                    new_lon = float(new_lon_str.replace(",", "."))
+                    current_lon = self.data.loc[self.data['series_id'] == series_id, 'lon'].iloc[0]
+                    if new_lon != current_lon:
+                        self.data.loc[self.data['series_id'] == series_id, 'lon'] = new_lon
+                        changes_made = True
+                except ValueError:
+                    messagebox.showwarning("Предупреждение",
+                                           "Пожалуйста, введите корректное числовое значение для долготы.")
+                    return
 
-            # Обновляем списки
-            self.update_station_listbox()
-            self.update_series_listbox()
+            # Проверяем и обновляем атмосферное давление, если введено новое значение и оно отличается
+            if new_pressure_str:
+                try:
+                    new_pressure = float(new_pressure_str.replace(",", "."))
+                    current_pressure = self.data.loc[self.data['series_id'] == series_id, 'pressure'].iloc[0]
+                    if pd.isnull(current_pressure) or new_pressure != current_pressure:
+                        self.data.loc[self.data['series_id'] == series_id, 'pressure'] = new_pressure
+                        changes_made = True
+                except ValueError:
+                    messagebox.showwarning("Предупреждение",
+                                           "Пожалуйста, введите корректное числовое значение для давления.")
+                    return
 
-            # Очищаем поля ввода
-            self.series_station_entry.delete(0, tk.END)
-            self.series_lat_entry.delete(0, tk.END)
-            self.series_lon_entry.delete(0, tk.END)
+            if changes_made:
+                # Обновляем отображение таблицы
+                self.table.update_data(self.data)
 
-            messagebox.showinfo("Информация", f"Серия {series_id} успешно обновлена.")
+                # Обновляем списки
+                self.update_station_listbox()
+                self.update_series_listbox()
+
+                # Очищаем поля ввода
+                self.series_station_entry.delete(0, tk.END)
+                self.series_lat_entry.delete(0, tk.END)
+                self.series_lon_entry.delete(0, tk.END)
+                self.pressure_entry.delete(0, tk.END)
+
+                messagebox.showinfo("Информация", f"Серия {series_id} успешно обновлена.")
+            else:
+                messagebox.showinfo("Информация", "Нет изменений для сохранения.")
         else:
             messagebox.showwarning("Предупреждение", "Пожалуйста, выберите серию для изменения.")
-
-    def save_pressure_changes(self):
-        """Сохранение атмосферного давления для выбранной серии"""
-        selected_index = self.series_listbox.curselection()
-        if selected_index:
-            series_id = self.data['series_id'].unique()[selected_index[0]]
-            try:
-                pressure = float(self.pressure_entry.get().replace(",", "."))
-            except ValueError:
-                messagebox.showwarning("Предупреждение",
-                                       "Пожалуйста, введите корректное числовое значение для давления.")
-                return
-
-            # Обновляем давление в данных для выбранной серии
-            self.data.loc[self.data['series_id'] == series_id, 'pressure'] = pressure
-
-            # Обновляем отображение таблицы
-            self.table.update_data(self.data)
-
-            # Очищаем поле ввода
-            self.pressure_entry.delete(0, tk.END)
-
-            messagebox.showinfo("Информация", "Атмосферное давление успешно сохранено для серии.")
-        else:
-            messagebox.showwarning("Предупреждение", "Пожалуйста, выберите серию для сохранения давления.")
-
-    def rename_station(self):
-        """Переименование выбранной станции"""
-        # Этот метод больше не нужен, так как переименование интегрировано в save_station_changes
-        pass
 
     def on_station_select(self, event):
         """Обработчик выбора станции в Listbox"""
         selected_index = self.station_listbox.curselection()
         if selected_index:
             station_name = self.station_listbox.get(selected_index)
+            self.current_station_name = station_name
             # Получаем текущие координаты для этой станции
             station_data = self.data[self.data['station'] == station_name]
             if not station_data.empty:
-                lat = station_data.iloc[0]['lat']
-                lon = station_data.iloc[0]['lon']
+                self.current_station_lat = station_data.iloc[0]['lat']
+                self.current_station_lon = station_data.iloc[0]['lon']
                 # Заполняем поля ввода координат
                 self.station_lat_entry.delete(0, tk.END)
-                self.station_lat_entry.insert(0, str(lat))
+                self.station_lat_entry.insert(0, str(self.current_station_lat))
                 self.station_lon_entry.delete(0, tk.END)
-                self.station_lon_entry.insert(0, str(lon))
+                self.station_lon_entry.insert(0, str(self.current_station_lon))
                 # Заполняем поле для переименования текущим названием станции
                 self.rename_station_entry.delete(0, tk.END)
                 self.rename_station_entry.insert(0, station_name)
@@ -399,19 +422,25 @@ class SurveyDataTab:
         selected_index = self.series_listbox.curselection()
         if selected_index:
             series_id = self.data['series_id'].unique()[selected_index[0]]
+            self.current_series_id = series_id
             series_data = self.data[self.data['series_id'] == series_id]
             if not series_data.empty:
-                # Получаем координаты первой записи серии
-                lat = series_data.iloc[0]['lat']
-                lon = series_data.iloc[0]['lon']
-                station_name = series_data.iloc[0]['station']
-                # Заполняем поля ввода координат и названия станции
+                self.current_series_station_name = series_data.iloc[0]['station']
+                self.current_series_lat = series_data.iloc[0]['lat']
+                self.current_series_lon = series_data.iloc[0]['lon']
+                self.current_series_pressure = series_data.iloc[0].get('pressure', None)
+                # Заполняем поля ввода координат, названия станции и давления
                 self.series_lat_entry.delete(0, tk.END)
-                self.series_lat_entry.insert(0, str(lat))
+                self.series_lat_entry.insert(0, str(self.current_series_lat))
                 self.series_lon_entry.delete(0, tk.END)
-                self.series_lon_entry.insert(0, str(lon))
+                self.series_lon_entry.insert(0, str(self.current_series_lon))
                 self.series_station_entry.delete(0, tk.END)
-                self.series_station_entry.insert(0, station_name)
+                self.series_station_entry.insert(0, self.current_series_station_name)
+                self.pressure_entry.delete(0, tk.END)
+                if pd.notnull(self.current_series_pressure):
+                    self.pressure_entry.insert(0, str(self.current_series_pressure))
+                else:
+                    self.pressure_entry.insert(0, "")
 
     def calculate_pressure_correction(self):
         """Расчет и применение поправок за атмосферное давление"""
@@ -467,6 +496,8 @@ class SurveyDataTab:
 
             # Обновляем отображение таблицы
             self.table.update_data(self.data)
+
+            messagebox.showinfo("Информация", "Приливные поправки успешно рассчитаны и применены.")
 
     def use_grs2(self):
         """Обработка данных в соответствии с требованиями GRS2"""
@@ -545,110 +576,3 @@ class SurveyDataTab:
             # Получаем актуальные данные из таблицы
             return self.table.get_dataframe()
         return self.data  # Возвращаем исходные данные, если таблица еще не создана
-
-    def save_station_changes(self):
-        """Сохранение изменений станции: переименование и координат"""
-        selected_index = self.station_listbox.curselection()
-        if selected_index:
-            station_name = self.station_listbox.get(selected_index)
-            new_name = self.rename_station_entry.get().strip()
-            try:
-                new_lat = float(self.station_lat_entry.get().replace(",", "."))
-                new_lon = float(self.station_lon_entry.get().replace(",", "."))
-            except ValueError:
-                messagebox.showwarning("Предупреждение",
-                                       "Пожалуйста, введите корректные числовые значения для координат.")
-                return
-
-            if not new_name:
-                messagebox.showwarning("Предупреждение", "Пожалуйста, введите новое название станции.")
-                return
-
-            # Обновляем название станции
-            self.data.loc[self.data['station'] == station_name, 'station'] = new_name
-
-            # Обновляем координаты станции
-            self.data.loc[self.data['station'] == new_name, 'lat'] = new_lat
-            self.data.loc[self.data['station'] == new_name, 'lon'] = new_lon
-
-            # Обновляем отображение таблицы
-            self.table.update_data(self.data)
-
-            # Обновляем списки
-            self.update_station_listbox()
-            self.update_series_listbox()
-
-            # Очищаем поля ввода
-            self.rename_station_entry.delete(0, tk.END)
-            self.station_lat_entry.delete(0, tk.END)
-            self.station_lon_entry.delete(0, tk.END)
-
-            messagebox.showinfo("Информация", f"Станция '{station_name}' успешно обновлена.")
-        else:
-            messagebox.showwarning("Предупреждение", "Пожалуйста, выберите станцию для изменения.")
-
-    def save_series_changes(self):
-        """Сохранение изменений серии: переименование станции и координат"""
-        selected_index = self.series_listbox.curselection()
-        if selected_index:
-            series_id = self.data['series_id'].unique()[selected_index[0]]
-            new_station_name = self.series_station_entry.get().strip()
-            try:
-                new_lat = float(self.series_lat_entry.get().replace(",", "."))
-                new_lon = float(self.series_lon_entry.get().replace(",", "."))
-            except ValueError:
-                messagebox.showwarning("Предупреждение",
-                                       "Пожалуйста, введите корректные числовые значения для координат.")
-                return
-
-            if not new_station_name:
-                messagebox.showwarning("Предупреждение", "Пожалуйста, введите новое название станции.")
-                return
-
-            # Обновляем название станции в данных для выбранной серии
-            self.data.loc[self.data['series_id'] == series_id, 'station'] = new_station_name
-
-            # Обновляем координаты серии
-            self.data.loc[self.data['series_id'] == series_id, 'lat'] = new_lat
-            self.data.loc[self.data['series_id'] == series_id, 'lon'] = new_lon
-
-            # Обновляем отображение таблицы
-            self.table.update_data(self.data)
-
-            # Обновляем списки
-            self.update_station_listbox()
-            self.update_series_listbox()
-
-            # Очищаем поля ввода
-            self.series_station_entry.delete(0, tk.END)
-            self.series_lat_entry.delete(0, tk.END)
-            self.series_lon_entry.delete(0, tk.END)
-
-            messagebox.showinfo("Информация", f"Серия {series_id} успешно обновлена.")
-        else:
-            messagebox.showwarning("Предупреждение", "Пожалуйста, выберите серию для изменения.")
-
-    def save_pressure_changes(self):
-        """Сохранение атмосферного давления для выбранной серии"""
-        selected_index = self.series_listbox.curselection()
-        if selected_index:
-            series_id = self.data['series_id'].unique()[selected_index[0]]
-            try:
-                pressure = float(self.pressure_entry.get().replace(",", "."))
-            except ValueError:
-                messagebox.showwarning("Предупреждение",
-                                       "Пожалуйста, введите корректное числовое значение для давления.")
-                return
-
-            # Обновляем давление в данных для выбранной серии
-            self.data.loc[self.data['series_id'] == series_id, 'pressure'] = pressure
-
-            # Обновляем отображение таблицы
-            self.table.update_data(self.data)
-
-            # Очищаем поле ввода
-            self.pressure_entry.delete(0, tk.END)
-
-            messagebox.showinfo("Информация", "Атмосферное давление успешно сохранено для серии.")
-        else:
-            messagebox.showwarning("Предупреждение", "Пожалуйста, выберите серию для сохранения давления.")
