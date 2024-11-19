@@ -220,13 +220,8 @@ class SurveyDataTab:
             messagebox.showerror("Ошибка", f"Отсутствуют необходимые столбцы: {', '.join(missing_columns)}")
             return
 
-        # Добавляем колонку для серии, изменяя series_id при изменении любого из указанных столбцов
-        self.data['series_id'] = (
-            self.data[['station', 'instrument_serial_number', 'created', 'line']]
-            .ne(self.data[['station', 'instrument_serial_number', 'created', 'line']].shift())
-            .any(axis=1)
-            .cumsum()
-        )
+        # Добавляем колонку для серии
+        self.update_series_id()
 
         # Добавляем колонку для атмосферного давления, если её нет
         if 'pressure' not in self.data.columns:
@@ -244,6 +239,16 @@ class SurveyDataTab:
         # Обновляем списки в Listbox
         self.update_station_listbox()
         self.update_series_listbox()
+
+    def update_series_id(self):
+        """Обновление столбца 'series_id' на основе текущих данных"""
+        if self.data is not None:
+            self.data['series_id'] = (
+                self.data[['station', 'instrument_serial_number', 'created', 'line']]
+                .ne(self.data[['station', 'instrument_serial_number', 'created', 'line']].shift())
+                .any(axis=1)
+                .cumsum()
+            )
 
     def update_station_listbox(self):
         """Обновление списка уникальных станций в Listbox"""
@@ -288,8 +293,7 @@ class SurveyDataTab:
             if new_lat_str:
                 try:
                     new_lat = float(new_lat_str.replace(",", "."))
-                    current_lat = \
-                        self.data.loc[self.data['station'] == new_name if new_name else station_name, 'lat'].iloc[0]
+                    current_lat = self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lat'].iloc[0]
                     if new_lat != current_lat:
                         self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lat'] = new_lat
                         changes_made = True
@@ -302,8 +306,7 @@ class SurveyDataTab:
             if new_lon_str:
                 try:
                     new_lon = float(new_lon_str.replace(",", "."))
-                    current_lon = \
-                        self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'].iloc[0]
+                    current_lon = self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'].iloc[0]
                     if new_lon != current_lon:
                         self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'] = new_lon
                         changes_made = True
@@ -313,6 +316,9 @@ class SurveyDataTab:
                     return
 
             if changes_made:
+                # Обновляем series_id
+                self.update_series_id()
+
                 # Обновляем отображение таблицы
                 self.table.update_data(self.data)
 
@@ -389,6 +395,9 @@ class SurveyDataTab:
                     return
 
             if changes_made:
+                # Обновляем series_id
+                self.update_series_id()
+
                 # Обновляем отображение таблицы
                 self.table.update_data(self.data)
 
@@ -481,6 +490,7 @@ class SurveyDataTab:
             # Округляем corr_grav для отображения
             self.data['corr_grav'] = self.data['corr_grav'].round(4)
 
+
             # Обновляем отображение таблицы
             self.table.update_data(self.data)
 
@@ -505,6 +515,7 @@ class SurveyDataTab:
             # Округляем corr_grav для отображения
             self.data['corr_grav'] = self.data['corr_grav'].round(4)
 
+
             # Обновляем отображение таблицы
             self.table.update_data(self.data)
 
@@ -514,6 +525,8 @@ class SurveyDataTab:
         """Обработка данных в соответствии с требованиями GRS2"""
         if self.data is not None:
             self.data = self.process_grs2_data(self.data)
+            # Обновляем series_id после обработки данных
+            self.update_series_id()
             # Обновляем отображение таблицы
             if self.table:
                 self.table.update_data(self.data)
