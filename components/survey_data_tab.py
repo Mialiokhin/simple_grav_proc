@@ -71,17 +71,23 @@ class SurveyDataTab:
         self.calc_pressure_button.pack(side='left', padx=5)
 
         # Переключатель режима: Edit Station или Edit Series
+        # Создаем отдельный фрейм для радиокнопок
+        mode_frame = tk.Frame(controls_frame)
+        mode_frame.pack(pady=5)
+
         self.mode_var = tk.StringVar(value="edit_station")
+
         self.edit_station_radio = tk.Radiobutton(
-            controls_frame, text="Edit Station", variable=self.mode_var,
+            mode_frame, text="Edit Station", variable=self.mode_var,
             value="edit_station", command=self.update_mode
         )
-        self.edit_station_radio.pack(pady=5)
+        self.edit_station_radio.pack(side='left', padx=10, pady=5)
+
         self.edit_series_radio = tk.Radiobutton(
-            controls_frame, text="Edit Series", variable=self.mode_var,
+            mode_frame, text="Edit Series", variable=self.mode_var,
             value="edit_series", command=self.update_mode
         )
-        self.edit_series_radio.pack(pady=5)
+        self.edit_series_radio.pack(side='left', padx=10, pady=5)
 
         # Фрейм для редактирования станций
         self.edit_station_frame = tk.Frame(controls_frame)
@@ -95,9 +101,6 @@ class SurveyDataTab:
         )
         self.station_listbox.pack(pady=5)
         self.station_listbox.bind('<<ListboxSelect>>', self.on_station_select)
-
-        self.rename_station_label = tk.Label(self.edit_station_frame, text="Edit:")
-        self.rename_station_label.pack(pady=5)
 
         self.station_lat_label = tk.Label(self.edit_station_frame, text="Latitude:")
         self.station_lat_label.pack(pady=2)
@@ -134,9 +137,6 @@ class SurveyDataTab:
         )
         self.series_listbox.pack(pady=5)
         self.series_listbox.bind('<<ListboxSelect>>', self.on_series_select)
-
-        self.series_coords_label = tk.Label(self.edit_series_frame, text="Edit Coordinates:")
-        self.series_coords_label.pack(pady=5)
 
         self.series_lat_label = tk.Label(self.edit_series_frame, text="Latitude:")
         self.series_lat_label.pack(pady=2)
@@ -280,7 +280,8 @@ class SurveyDataTab:
             if new_lat_str:
                 try:
                     new_lat = float(new_lat_str.replace(",", "."))
-                    current_lat = self.data.loc[self.data['station'] == new_name if new_name else station_name, 'lat'].iloc[0]
+                    current_lat = \
+                        self.data.loc[self.data['station'] == new_name if new_name else station_name, 'lat'].iloc[0]
                     if new_lat != current_lat:
                         self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lat'] = new_lat
                         changes_made = True
@@ -293,7 +294,8 @@ class SurveyDataTab:
             if new_lon_str:
                 try:
                     new_lon = float(new_lon_str.replace(",", "."))
-                    current_lon = self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'].iloc[0]
+                    current_lon = \
+                        self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'].iloc[0]
                     if new_lon != current_lon:
                         self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'] = new_lon
                         changes_made = True
@@ -334,7 +336,8 @@ class SurveyDataTab:
             changes_made = False  # Флаг, указывающий на наличие изменений
 
             # Проверяем и обновляем название станции, если введено новое имя и оно отличается
-            if new_station_name and new_station_name != self.data.loc[self.data['series_id'] == series_id, 'station'].iloc[0]:
+            if new_station_name and new_station_name != \
+                    self.data.loc[self.data['series_id'] == series_id, 'station'].iloc[0]:
                 self.data.loc[self.data['series_id'] == series_id, 'station'] = new_station_name
                 changes_made = True
 
