@@ -102,15 +102,19 @@ class SurveyDataTab:
         self.station_listbox.pack(pady=5)
         self.station_listbox.bind('<<ListboxSelect>>', self.on_station_select)
 
-        self.station_lat_label = tk.Label(self.edit_station_frame, text="Latitude:")
-        self.station_lat_label.pack(pady=2)
-        self.station_lat_entry = tk.Entry(self.edit_station_frame, width=30)
-        self.station_lat_entry.pack(pady=2)
+        # Создаем субфрейм для координат (Lat и Lon)
+        station_coords_frame = tk.Frame(self.edit_station_frame)
+        station_coords_frame.pack(pady=2)
 
-        self.station_lon_label = tk.Label(self.edit_station_frame, text="Longitude:")
-        self.station_lon_label.pack(pady=2)
-        self.station_lon_entry = tk.Entry(self.edit_station_frame, width=30)
-        self.station_lon_entry.pack(pady=2)
+        self.station_lat_label = tk.Label(station_coords_frame, text="Lat:")
+        self.station_lat_label.pack(side='left', padx=(0, 5))
+        self.station_lat_entry = tk.Entry(station_coords_frame, width=20)  # Увеличено до 20
+        self.station_lat_entry.pack(side='left', padx=(0, 15))
+
+        self.station_lon_label = tk.Label(station_coords_frame, text="Lon:")
+        self.station_lon_label.pack(side='left', padx=(0, 5))
+        self.station_lon_entry = tk.Entry(station_coords_frame, width=20)  # Увеличено до 20
+        self.station_lon_entry.pack(side='left')
 
         self.series_station_label = tk.Label(self.edit_station_frame, text="Station Name:")
         self.series_station_label.pack(pady=2)
@@ -138,15 +142,19 @@ class SurveyDataTab:
         self.series_listbox.pack(pady=5)
         self.series_listbox.bind('<<ListboxSelect>>', self.on_series_select)
 
-        self.series_lat_label = tk.Label(self.edit_series_frame, text="Latitude:")
-        self.series_lat_label.pack(pady=2)
-        self.series_lat_entry = tk.Entry(self.edit_series_frame, width=30)
-        self.series_lat_entry.pack(pady=2)
+        # Создаем субфрейм для координат (Lat и Lon)
+        series_coords_frame = tk.Frame(self.edit_series_frame)
+        series_coords_frame.pack(pady=2)
 
-        self.series_lon_label = tk.Label(self.edit_series_frame, text="Longitude:")
-        self.series_lon_label.pack(pady=2)
-        self.series_lon_entry = tk.Entry(self.edit_series_frame, width=30)
-        self.series_lon_entry.pack(pady=2)
+        self.series_lat_label = tk.Label(series_coords_frame, text="Lat:")
+        self.series_lat_label.pack(side='left', padx=(0, 5))
+        self.series_lat_entry = tk.Entry(series_coords_frame, width=20)
+        self.series_lat_entry.pack(side='left', padx=(0, 15))
+
+        self.series_lon_label = tk.Label(series_coords_frame, text="Lon:")
+        self.series_lon_label.pack(side='left', padx=(0, 5))
+        self.series_lon_entry = tk.Entry(series_coords_frame, width=20)
+        self.series_lon_entry.pack(side='left')
 
         # Добавление полей для изменения названия станции при редактировании серии
         self.series_station_label = tk.Label(self.edit_series_frame, text="Station Name:")
