@@ -45,7 +45,8 @@ class InputDataTable:
             self.tree.column(col, anchor="w", width=100)
 
         # Определяем, для каких колонок нужно форматировать данные
-        columns_to_format_1_decimal = ['instr_height', 'corr_grav', 'std_err']  # Колонки с 1 знаком после запятой
+        columns_to_format_1_decimal = ['instr_height', 'std_err']  # Колонки с 1 знаком после запятой
+        columns_to_format_4_decimal = ['corr_grav', 'pressure_corr']  # Колонки с 1 знаком после запятой
         columns_to_format_9_decimals = ['lat', 'lon']  # Колонки с 9 знаками после запятой
 
         # Цвета для станций (пастельные)
@@ -74,6 +75,7 @@ class InputDataTable:
             # Форматирование строки
             formatted_row = [
                 f'{val:.1f}' if col in columns_to_format_1_decimal and isinstance(val, float) else
+                f'{val:.4f}' if col in columns_to_format_4_decimal and isinstance(val, float) else
                 f'{val:.9f}' if col in columns_to_format_9_decimals and isinstance(val, float) else
                 val
                 for col, val in zip(self.dataframe.columns, row)

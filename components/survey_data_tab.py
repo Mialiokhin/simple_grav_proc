@@ -293,7 +293,8 @@ class SurveyDataTab:
             if new_lat_str:
                 try:
                     new_lat = float(new_lat_str.replace(",", "."))
-                    current_lat = self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lat'].iloc[0]
+                    current_lat = \
+                        self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lat'].iloc[0]
                     if new_lat != current_lat:
                         self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lat'] = new_lat
                         changes_made = True
@@ -306,7 +307,8 @@ class SurveyDataTab:
             if new_lon_str:
                 try:
                     new_lon = float(new_lon_str.replace(",", "."))
-                    current_lon = self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'].iloc[0]
+                    current_lon = \
+                        self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'].iloc[0]
                     if new_lon != current_lon:
                         self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'] = new_lon
                         changes_made = True
@@ -463,33 +465,45 @@ class SurveyDataTab:
                     self.pressure_entry.insert(0, "")
 
     def calculate_pressure_correction(self):
-        """Расчет и применение поправок за атмосферное давление"""
+        """Расчет и применение поправок за атмосферное давление для каждой линии"""
         if self.data is not None:
-            # Стандартное атмосферное давление
-            P0 = 1013.25  # hPa
-            # Коэффициент чувствительности
-            k = 0.003274  # может отличаться в зависимости от оборудования
+            k = -0.003  # Коэффициент для расчета поправки
 
             # Проверяем, что давление введено для всех серий
             if self.data['pressure'].isnull().any():
                 messagebox.showwarning("Предупреждение", "Необходимо ввести атмосферное давление для всех серий.")
                 return
 
-            # Рассчитываем поправку для каждой серии
-            pressure_corrections = self.data.groupby('series_id')['pressure'].first().apply(lambda P: k * (P - P0))
+            # Группируем данные по линии
+            line_groups = self.data.groupby('line')
 
-            # Добавляем колонку 'pressure_corr', если её нет
-            if 'pressure_corr' not in self.data.columns:
-                self.data['pressure_corr'] = 0.0
+            for line, group in line_groups:
+                # Сортируем серии по порядку
+                group_sorted = group.sort_values(by='series_id')
 
-            # Применяем поправку к corr_grav для каждой серии
-            for series_id, correction in pressure_corrections.items():
-                self.data.loc[self.data['series_id'] == series_id, 'pressure_corr'] = round(correction, 4)
-                self.data.loc[self.data['series_id'] == series_id, 'corr_grav'] += correction
+                # Берем давление первой серии как эталонное для данной линии
+                first_series_pressure = group_sorted.iloc[0]['pressure']
+
+                # Рассчитываем поправку для каждой серии на линии
+                pressure_corrections = group_sorted['pressure'].apply(lambda P: k * (P - first_series_pressure))
+
+                # Добавляем колонку 'pressure_corr', если её нет
+                if 'pressure_corr' not in self.data.columns:
+                    self.data['pressure_corr'] = 0.0
+
+                # Применяем поправку для каждой серии
+                for idx, correction in pressure_corrections.items():
+                    # Если поправка уже была рассчитана для этой строки, то отнимаем старую
+                    if pd.notnull(self.data.at[idx, 'pressure_corr']):
+                        self.data.at[idx, 'corr_grav'] -= self.data.at[idx, 'pressure_corr']
+
+                    # Применяем новую поправку
+                    self.data.at[idx, 'pressure_corr'] = round(correction, 4)
+                    self.data.at[
+                        idx, 'corr_grav'] += correction  # Добавляем новую поправку к измеренному гравитационному значению
 
             # Округляем corr_grav для отображения
             self.data['corr_grav'] = self.data['corr_grav'].round(4)
-
 
             # Обновляем отображение таблицы
             self.table.update_data(self.data)
@@ -514,7 +528,6 @@ class SurveyDataTab:
 
             # Округляем corr_grav для отображения
             self.data['corr_grav'] = self.data['corr_grav'].round(4)
-
 
             # Обновляем отображение таблицы
             self.table.update_data(self.data)
