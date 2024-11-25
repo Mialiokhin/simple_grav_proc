@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 from components.input_data_table import InputDataTable
 from grav_proc.loader import read_data
 from grav_proc.calculations import make_frame_to_proc
@@ -175,16 +175,42 @@ class SurveyDataTab:
         )
         self.save_series_changes_button.pack(pady=5)
 
+        # Добавляем фрейм для сообщений и размещаем его внизу
+        message_frame = tk.Frame(controls_frame)
+        message_frame.pack(side='bottom', fill='x', pady=10)
+
+        # Используем Text виджет для отображения сообщений
+        self.message_text = tk.Text(
+            message_frame, width=50, height=4,
+            wrap='word', relief='sunken', state='disabled'
+        )
+        self.message_text.pack(fill='both', expand=True)
+
         # Настройка адаптивного изменения размеров
         self.frame.grid_rowconfigure(0, weight=1)
         self.frame.grid_columnconfigure(0, weight=1)
+
+    def display_message(self, message, message_type="info"):
+        """Отображение сообщения в message_text с соответствующим цветом фона."""
+        colors = {
+            "error": "#ffcccc",  # pale red
+            "warning": "#ffebcc",  # pale orange
+            "success": "#ccffcc",  # pale green
+            "info": "#ccffcc"  # treat info as success
+        }
+        bg_color = colors.get(message_type, "#ccffcc")  # default to pale green
+
+        self.message_text.configure(state='normal')
+        self.message_text.delete(1.0, tk.END)
+        self.message_text.insert(tk.END, message)
+        self.message_text.configure(state='disabled', bg=bg_color)
 
     def update_mode(self):
         """Обновление интерфейса в зависимости от выбранного режима"""
         mode = self.mode_var.get()
         if mode == "edit_station":
-            self.edit_station_frame.pack(pady=5)
             self.edit_series_frame.pack_forget()
+            self.edit_station_frame.pack(pady=5)
         elif mode == "edit_series":
             self.edit_station_frame.pack_forget()
             self.edit_series_frame.pack(pady=5)
@@ -209,7 +235,7 @@ class SurveyDataTab:
 
             self.data = make_frame_to_proc(raw_data)
         except Exception as e:
-            messagebox.showerror("Ошибка", f"Не удалось загрузить данные: {e}")
+            self.display_message(f"Не удалось загрузить данные: {e}", message_type="error")
             return
 
         # Проверка наличия необходимых столбцов
@@ -217,7 +243,7 @@ class SurveyDataTab:
                             'date_time']
         missing_columns = [col for col in required_columns if col not in self.data.columns]
         if missing_columns:
-            messagebox.showerror("Ошибка", f"Отсутствуют необходимые столбцы: {', '.join(missing_columns)}")
+            self.display_message(f"Отсутствуют необходимые столбцы: {', '.join(missing_columns)}", message_type="error")
             return
 
         # Добавляем колонку для серии
@@ -299,8 +325,8 @@ class SurveyDataTab:
                         self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lat'] = new_lat
                         changes_made = True
                 except ValueError:
-                    messagebox.showwarning("Предупреждение",
-                                           "Пожалуйста, введите корректное числовое значение для широты.")
+                    self.display_message("Пожалуйста, введите корректное числовое значение для широты.",
+                                         message_type="warning")
                     return
 
             # Проверяем и обновляем долготу, если введено новое значение и оно отличается
@@ -313,8 +339,8 @@ class SurveyDataTab:
                         self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'] = new_lon
                         changes_made = True
                 except ValueError:
-                    messagebox.showwarning("Предупреждение",
-                                           "Пожалуйста, введите корректное числовое значение для долготы.")
+                    self.display_message("Пожалуйста, введите корректное числовое значение для долготы.",
+                                         message_type="warning")
                     return
 
             if changes_made:
@@ -333,11 +359,11 @@ class SurveyDataTab:
                 self.station_lat_entry.delete(0, tk.END)
                 self.station_lon_entry.delete(0, tk.END)
 
-                messagebox.showinfo("Информация", f"Станция '{station_name}' успешно обновлена.")
+                self.display_message(f"Станция '{station_name}' успешно обновлена.", message_type="success")
             else:
-                messagebox.showinfo("Информация", "Нет изменений для сохранения.")
+                self.display_message("Нет изменений для сохранения.", message_type="success")
         else:
-            messagebox.showwarning("Предупреждение", "Пожалуйста, выберите станцию для изменения.")
+            self.display_message("Пожалуйста, выберите станцию для изменения.", message_type="warning")
 
     def save_series_changes(self):
         """Сохранение изменений серии: переименование станции, координат и давления"""
@@ -366,8 +392,8 @@ class SurveyDataTab:
                         self.data.loc[self.data['series_id'] == series_id, 'lat'] = new_lat
                         changes_made = True
                 except ValueError:
-                    messagebox.showwarning("Предупреждение",
-                                           "Пожалуйста, введите корректное числовое значение для широты.")
+                    self.display_message("Пожалуйста, введите корректное числовое значение для широты.",
+                                         message_type="warning")
                     return
 
             # Проверяем и обновляем долготу, если введено новое значение и оно отличается
@@ -379,8 +405,8 @@ class SurveyDataTab:
                         self.data.loc[self.data['series_id'] == series_id, 'lon'] = new_lon
                         changes_made = True
                 except ValueError:
-                    messagebox.showwarning("Предупреждение",
-                                           "Пожалуйста, введите корректное числовое значение для долготы.")
+                    self.display_message("Пожалуйста, введите корректное числовое значение для долготы.",
+                                         message_type="warning")
                     return
 
             # Проверяем и обновляем атмосферное давление, если введено новое значение и оно отличается
@@ -392,8 +418,8 @@ class SurveyDataTab:
                         self.data.loc[self.data['series_id'] == series_id, 'pressure'] = new_pressure
                         changes_made = True
                 except ValueError:
-                    messagebox.showwarning("Предупреждение",
-                                           "Пожалуйста, введите корректное числовое значение для давления.")
+                    self.display_message("Пожалуйста, введите корректное числовое значение для давления.",
+                                         message_type="warning")
                     return
 
             if changes_made:
@@ -413,11 +439,11 @@ class SurveyDataTab:
                 self.series_lon_entry.delete(0, tk.END)
                 self.pressure_entry.delete(0, tk.END)
 
-                messagebox.showinfo("Информация", f"Серия {series_id} успешно обновлена.")
+                self.display_message(f"Серия {series_id} успешно обновлена.", message_type="success")
             else:
-                messagebox.showinfo("Информация", "Нет изменений для сохранения.")
+                self.display_message("Нет изменений для сохранения.", message_type="success")
         else:
-            messagebox.showwarning("Предупреждение", "Пожалуйста, выберите серию для изменения.")
+            self.display_message("Пожалуйста, выберите серию для изменения.", message_type="warning")
 
     def on_station_select(self, event):
         """Обработчик выбора станции в Listbox"""
@@ -471,7 +497,7 @@ class SurveyDataTab:
 
             # Проверяем, что давление введено для всех серий
             if self.data['pressure'].isnull().any():
-                messagebox.showwarning("Предупреждение", "Необходимо ввести атмосферное давление для всех серий.")
+                self.display_message("Необходимо ввести атмосферное давление для всех серий.", message_type="warning")
                 return
 
             # Группируем данные по линии
@@ -508,7 +534,8 @@ class SurveyDataTab:
             # Обновляем отображение таблицы
             self.table.update_data(self.data)
 
-            messagebox.showinfo("Информация", "Поправки за атмосферное давление успешно рассчитаны и применены.")
+            self.display_message("Поправки за атмосферное давление успешно рассчитаны и применены.",
+                                 message_type="success")
 
     def calculate_tidal_correction(self):
         """Расчет и применение приливных поправок"""
@@ -532,7 +559,7 @@ class SurveyDataTab:
             # Обновляем отображение таблицы
             self.table.update_data(self.data)
 
-            messagebox.showinfo("Информация", "Приливные поправки успешно рассчитаны и применены.")
+            self.display_message("Приливные поправки успешно рассчитаны и применены.", message_type="success")
 
     def use_grs2(self):
         """Обработка данных в соответствии с требованиями GRS2"""
@@ -565,6 +592,7 @@ class SurveyDataTab:
             current_station = row['station']
             current_instrument = row['instrument_serial_number']
             current_created = row['created']
+
             if current_instrument != instrument or current_created != created:
                 station_count = 1
                 instrument = row['instrument_serial_number']
@@ -585,6 +613,9 @@ class SurveyDataTab:
                         duplicated_row = temp_row.copy()
                         duplicated_row['line'] = line_count
                         processed_rows.append(duplicated_row)
+                    # Вывод сообщения о дублировании строк
+                    self.display_message(f"Дублирование {survey_count} строк для линии {line_count}",
+                                         message_type="info")
 
                 # Обновляем station_name и сбрасываем survey_count
                 station_name = current_station
@@ -595,6 +626,9 @@ class SurveyDataTab:
 
         df_processed = pd.DataFrame(processed_rows)
         df_processed.reset_index(drop=True, inplace=True)
+
+        # Вывод сообщения об успешной обработке
+        self.display_message("Данные успешно обработаны для программы измерений ГРС2.", message_type="success")
 
         return df_processed
 
