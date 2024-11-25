@@ -20,6 +20,7 @@ class SurveyDataTab:
         self.current_station_name = None
         self.current_station_lat = None
         self.current_station_lon = None
+        self.current_station_pressure = None
 
         self.current_series_id = None
         self.current_series_station_name = None
@@ -71,7 +72,6 @@ class SurveyDataTab:
         self.calc_pressure_button.pack(side='left', padx=5)
 
         # Переключатель режима: Edit Station или Edit Series
-        # Создаем отдельный фрейм для радиокнопок
         mode_frame = tk.Frame(controls_frame)
         mode_frame.pack(pady=5)
 
@@ -108,18 +108,27 @@ class SurveyDataTab:
 
         self.station_lat_label = tk.Label(station_coords_frame, text="Lat:")
         self.station_lat_label.pack(side='left', padx=(0, 5))
-        self.station_lat_entry = tk.Entry(station_coords_frame, width=20)  # Увеличено до 20
+        self.station_lat_entry = tk.Entry(station_coords_frame, width=20)
         self.station_lat_entry.pack(side='left', padx=(0, 15))
 
         self.station_lon_label = tk.Label(station_coords_frame, text="Lon:")
         self.station_lon_label.pack(side='left', padx=(0, 5))
-        self.station_lon_entry = tk.Entry(station_coords_frame, width=20)  # Увеличено до 20
+        self.station_lon_entry = tk.Entry(station_coords_frame, width=20)
         self.station_lon_entry.pack(side='left')
 
-        self.series_station_label = tk.Label(self.edit_station_frame, text="Station Name:")
-        self.series_station_label.pack(pady=2)
-        self.rename_station_entry = tk.Entry(self.edit_station_frame, width=30)
-        self.rename_station_entry.pack(pady=5)
+        # Субфрейм для имени станции и давления (в одну строчку)
+        station_name_pressure_frame = tk.Frame(self.edit_station_frame)
+        station_name_pressure_frame.pack(pady=2)
+
+        self.series_station_label = tk.Label(station_name_pressure_frame, text="Station Name:")
+        self.series_station_label.pack(side='left', padx=(0, 5))
+        self.rename_station_entry = tk.Entry(station_name_pressure_frame, width=20)
+        self.rename_station_entry.pack(side='left', padx=(0, 15))
+
+        self.pressure_label_station = tk.Label(station_name_pressure_frame, text="Pressure (hPa):")
+        self.pressure_label_station.pack(side='left', padx=(0, 5))
+        self.pressure_entry_station = tk.Entry(station_name_pressure_frame, width=20)
+        self.pressure_entry_station.pack(side='left')
 
         # Объединённая кнопка сохранения для станций
         self.save_station_changes_button = tk.Button(
@@ -156,17 +165,19 @@ class SurveyDataTab:
         self.series_lon_entry = tk.Entry(series_coords_frame, width=20)
         self.series_lon_entry.pack(side='left')
 
-        # Добавление полей для изменения названия станции при редактировании серии
-        self.series_station_label = tk.Label(self.edit_series_frame, text="Station Name:")
-        self.series_station_label.pack(pady=5)
-        self.series_station_entry = tk.Entry(self.edit_series_frame, width=30)
-        self.series_station_entry.pack(pady=2)
+        # Субфрейм для имени станции и давления (в одну строчку)
+        series_name_pressure_frame = tk.Frame(self.edit_series_frame)
+        series_name_pressure_frame.pack(pady=2)
 
-        # Добавление поля для ввода атмосферного давления
-        self.pressure_label = tk.Label(self.edit_series_frame, text="Atmospheric Pressure (hPa):")
-        self.pressure_label.pack(pady=5)
-        self.pressure_entry = tk.Entry(self.edit_series_frame, width=30)
-        self.pressure_entry.pack(pady=5)
+        self.series_station_label = tk.Label(series_name_pressure_frame, text="Station Name:")
+        self.series_station_label.pack(side='left', padx=(0, 5))
+        self.series_station_entry = tk.Entry(series_name_pressure_frame, width=20)
+        self.series_station_entry.pack(side='left', padx=(0, 15))
+
+        self.pressure_label = tk.Label(series_name_pressure_frame, text="Pressure (hPa):")
+        self.pressure_label.pack(side='left', padx=(0, 5))
+        self.pressure_entry = tk.Entry(series_name_pressure_frame, width=20)
+        self.pressure_entry.pack(side='left')
 
         # Объединённая кнопка сохранения для серий
         self.save_series_changes_button = tk.Button(
@@ -200,10 +211,10 @@ class SurveyDataTab:
         }
         bg_color = colors.get(message_type, "#ccffcc")  # default to pale green
 
-        self.message_text.configure(state='normal')
+        self.message_text.configure(state='normal', bg=bg_color)
         self.message_text.delete(1.0, tk.END)
         self.message_text.insert(tk.END, message)
-        self.message_text.configure(state='disabled', bg=bg_color)
+        self.message_text.configure(state='disabled')
 
     def update_mode(self):
         """Обновление интерфейса в зависимости от выбранного режима"""
@@ -300,13 +311,14 @@ class SurveyDataTab:
                 self.series_listbox.insert(tk.END, series_text)
 
     def save_station_changes(self):
-        """Сохранение изменений станции: переименование и координат"""
+        """Сохранение изменений станции: переименование, координаты и давление"""
         selected_index = self.station_listbox.curselection()
         if selected_index:
             station_name = self.station_listbox.get(selected_index)
             new_name = self.rename_station_entry.get().strip()
             new_lat_str = self.station_lat_entry.get().strip()
             new_lon_str = self.station_lon_entry.get().strip()
+            new_pressure_str = self.pressure_entry_station.get().strip()
 
             changes_made = False  # Флаг, указывающий на наличие изменений
 
@@ -319,8 +331,9 @@ class SurveyDataTab:
             if new_lat_str:
                 try:
                     new_lat = float(new_lat_str.replace(",", "."))
-                    current_lat = \
-                        self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lat'].iloc[0]
+                    current_lat = self.data.loc[
+                        self.data['station'] == (new_name if new_name else station_name), 'lat'
+                    ].iloc[0]
                     if new_lat != current_lat:
                         self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lat'] = new_lat
                         changes_made = True
@@ -333,13 +346,29 @@ class SurveyDataTab:
             if new_lon_str:
                 try:
                     new_lon = float(new_lon_str.replace(",", "."))
-                    current_lon = \
-                        self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'].iloc[0]
+                    current_lon = self.data.loc[
+                        self.data['station'] == (new_name if new_name else station_name), 'lon'
+                    ].iloc[0]
                     if new_lon != current_lon:
                         self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'] = new_lon
                         changes_made = True
                 except ValueError:
                     self.display_message("Пожалуйста, введите корректное числовое значение для долготы.",
+                                         message_type="warning")
+                    return
+
+            # Проверяем и обновляем атмосферное давление, если введено новое значение и оно отличается
+            if new_pressure_str:
+                try:
+                    new_pressure = float(new_pressure_str.replace(",", "."))
+                    current_pressure = self.data.loc[
+                        self.data['station'] == (new_name if new_name else station_name), 'pressure'
+                    ].iloc[0]
+                    if pd.isnull(current_pressure) or new_pressure != current_pressure:
+                        self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'pressure'] = new_pressure
+                        changes_made = True
+                except ValueError:
+                    self.display_message("Пожалуйста, введите корректное числовое значение для давления.",
                                          message_type="warning")
                     return
 
@@ -358,6 +387,7 @@ class SurveyDataTab:
                 self.rename_station_entry.delete(0, tk.END)
                 self.station_lat_entry.delete(0, tk.END)
                 self.station_lon_entry.delete(0, tk.END)
+                self.pressure_entry_station.delete(0, tk.END)
 
                 self.display_message(f"Станция '{station_name}' успешно обновлена.", message_type="success")
             else:
@@ -451,12 +481,13 @@ class SurveyDataTab:
         if selected_index:
             station_name = self.station_listbox.get(selected_index)
             self.current_station_name = station_name
-            # Получаем текущие координаты для этой станции
+            # Получаем текущие данные для этой станции
             station_data = self.data[self.data['station'] == station_name]
             if not station_data.empty:
                 self.current_station_lat = station_data.iloc[0]['lat']
                 self.current_station_lon = station_data.iloc[0]['lon']
-                # Заполняем поля ввода координат
+                self.current_station_pressure = station_data.iloc[0].get('pressure', None)
+                # Заполняем поля ввода координат и давления
                 self.station_lat_entry.delete(0, tk.END)
                 self.station_lat_entry.insert(0, str(self.current_station_lat))
                 self.station_lon_entry.delete(0, tk.END)
@@ -464,6 +495,12 @@ class SurveyDataTab:
                 # Заполняем поле для переименования текущим названием станции
                 self.rename_station_entry.delete(0, tk.END)
                 self.rename_station_entry.insert(0, station_name)
+                # Заполняем поле давления
+                self.pressure_entry_station.delete(0, tk.END)
+                if pd.notnull(self.current_station_pressure):
+                    self.pressure_entry_station.insert(0, str(self.current_station_pressure))
+                else:
+                    self.pressure_entry_station.insert(0, "")
 
     def on_series_select(self, event):
         """Обработчик выбора серии в Listbox"""
@@ -595,10 +632,11 @@ class SurveyDataTab:
 
             if current_instrument != instrument or current_created != created:
                 station_count = 1
-                instrument = row['instrument_serial_number']
-                created = row['created']
+                instrument = current_instrument
+                created = current_created
                 line_count += 1
-                station_name = row['station']
+                station_name = current_station
+
             if current_station == station_name:
                 survey_count += 1
                 row['line'] = line_count
