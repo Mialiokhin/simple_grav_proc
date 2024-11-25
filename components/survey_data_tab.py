@@ -142,11 +142,11 @@ class SurveyDataTab:
         # Изначально скрываем
         self.edit_series_frame.pack_forget()
 
-        self.series_list_label = tk.Label(self.edit_series_frame, text="Series:")
+        self.series_list_label = tk.Label(self.edit_series_frame, text="Series:\nline-survey-instrument-series-station")
         self.series_list_label.pack(pady=5)
         self.series_listbox = tk.Listbox(
             self.edit_series_frame, selectmode=tk.SINGLE,
-            exportselection=False, height=10
+            exportselection=False, height=10, width=50
         )
         self.series_listbox.pack(pady=5)
         self.series_listbox.bind('<<ListboxSelect>>', self.on_series_select)
@@ -302,12 +302,16 @@ class SurveyDataTab:
         """Обновление списка серий в Listbox"""
         if self.data is not None:
             # Получаем уникальные серии
-            unique_series = self.data[['series_id', 'station', 'line']].drop_duplicates().sort_values('series_id')
+            unique_series = self.data[
+                ['series_id', 'station', 'line', 'instrument_serial_number',
+                 'survey_name']].drop_duplicates().sort_values(
+                'series_id')
             # Очищаем Listbox
             self.series_listbox.delete(0, tk.END)
             # Заполняем Listbox сериями
             for _, row in unique_series.iterrows():
-                series_text = f"line{row['line']}-S{row['series_id']}-{row['station']}"
+                instr_serial = str(row['instrument_serial_number'])[-3:]
+                series_text = f"line{row['line']}-({row['survey_name']})-<{instr_serial}>-S{row['series_id']}-{row['station']}"
                 self.series_listbox.insert(tk.END, series_text)
 
     def save_station_changes(self):
@@ -365,7 +369,8 @@ class SurveyDataTab:
                         self.data['station'] == (new_name if new_name else station_name), 'pressure'
                     ].iloc[0]
                     if pd.isnull(current_pressure) or new_pressure != current_pressure:
-                        self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'pressure'] = new_pressure
+                        self.data.loc[
+                            self.data['station'] == (new_name if new_name else station_name), 'pressure'] = new_pressure
                         changes_made = True
                 except ValueError:
                     self.display_message("Пожалуйста, введите корректное числовое значение для давления.",
