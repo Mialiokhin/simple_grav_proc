@@ -619,53 +619,224 @@ class SurveyDataTab:
     def process_grs2_data(self, df):
         """Обработка DataFrame для приведения к программе измерений ГРС2"""
         df = df.copy()
-        station_count = 1
-        line_count = 1
-        survey_count = 0
-        station_name = df.iloc[0]['station']
+        station_count = 1  # Счетчик станций
+        line_count = 1  # Счетчик линий
         instrument = df.iloc[0]['instrument_serial_number']
         created = df.iloc[0]['created']
-        df['line'] = 0  # Инициализируем колонку 'Line'
+        station_name = df.iloc[0]['station']
+        station_rows = []  # Список для хранения строк текущей станции
+        stations_data = {}  # Словарь для хранения данных по станциям
+        processed_rows = []  # Итоговый список обработанных строк
 
-        processed_rows = []
-        temp_rows = []
+        df['line'] = 0  # Инициализируем колонку 'line'
 
         for idx, row in df.iterrows():
             current_station = row['station']
             current_instrument = row['instrument_serial_number']
             current_created = row['created']
 
+            # Проверяем смену прибора или даты создания
             if current_instrument != instrument or current_created != created:
+                # Сохраняем данные предыдущей станции перед сбросом
+                if station_rows:
+                    stations_data[station_count] = station_rows.copy()
+
+                    # Обрабатываем данные предыдущей станции
+                    # Обрабатываем данные в соответствии с номером станции
+                    if station_count == 1:
+                        # Обработка первой станции без изменений
+                        for s_row in station_rows:
+                            processed_rows.append(s_row.copy())
+                    elif station_count in [2, 3]:
+                        # Обработка второй и третьей станций без изменений
+                        for s_row in station_rows:
+                            processed_rows.append(s_row.copy())
+                    elif station_count == 4:
+                        # Обработка четвертой станции и дублирование
+                        for s_row in station_rows:
+                            processed_rows.append(s_row.copy())
+                        # В данном случае данные после текущей станции отсутствуют, поэтому дублирование не произойдет
+                        # Так как мы уже обнаружили смену прибора или даты
+                    elif station_count in [5, 6]:
+                        # Обработка пятой и шестой станций без изменений
+                        for s_row in station_rows:
+                            processed_rows.append(s_row.copy())
+                    elif station_count == 7:
+                        # Обработка седьмой станции и дублирование
+                        for s_row in station_rows:
+                            processed_rows.append(s_row.copy())
+                        # Дублирование не происходит, так как прибор или дата изменились
+                    elif station_count in [8, 9]:
+                        # Обработка восьмой и девятой станций без изменений
+                        for s_row in station_rows:
+                            processed_rows.append(s_row.copy())
+                    elif station_count == 10:
+                        # Обработка десятой станции без изменений
+                        for s_row in station_rows:
+                            processed_rows.append(s_row.copy())
+
+                    # Дублирование измерений после определенных станций
+                    # Не выполняем дублирование, так как прибор или дата изменились
+
+                # Сбрасываем счетчики
                 station_count = 1
+                line_count += 1
                 instrument = current_instrument
                 created = current_created
-                line_count += 1
                 station_name = current_station
+                station_rows = []
+                stations_data = {}
+                row['line'] = line_count
+                station_rows.append(row.copy())
+                continue  # Переходим к следующей итерации
 
             if current_station == station_name:
-                survey_count += 1
+                # Собираем строки текущей станции
                 row['line'] = line_count
-                temp_rows.append(row.copy())
-                processed_rows.append(row.copy())
+                station_rows.append(row.copy())
             else:
-                station_count += 1
-                if station_count == 5 or station_count == 8:
-                    line_count += 1
-                    # Дублируем последние survey_count строк
-                    for temp_row in temp_rows[-survey_count:]:
-                        duplicated_row = temp_row.copy()
-                        duplicated_row['line'] = line_count
-                        processed_rows.append(duplicated_row)
-                    # Вывод сообщения о дублировании строк
-                    self.display_message(f"Дублирование {survey_count} строк для линии {line_count}",
-                                         message_type="info")
+                # Станция изменилась, сохраняем данные предыдущей станции
+                stations_data[station_count] = station_rows.copy()
 
-                # Обновляем station_name и сбрасываем survey_count
+                # Обрабатываем данные в соответствии с номером станции
+                if station_count == 1:
+                    # Обработка первой станции без изменений
+                    for s_row in station_rows:
+                        processed_rows.append(s_row.copy())
+                elif station_count in [2, 3]:
+                    # Обработка второй и третьей станций без изменений
+                    for s_row in station_rows:
+                        processed_rows.append(s_row.copy())
+                elif station_count == 4:
+                    # Обработка четвертой станции и дублирование
+                    for s_row in station_rows:
+                        processed_rows.append(s_row.copy())
+                    # Проверяем наличие данных после текущей станции и отсутствие смены прибора или даты
+                    if idx + 1 < len(df) and df.iloc[idx + 1]['instrument_serial_number'] == instrument and \
+                            df.iloc[idx + 1]['created'] == created:
+                        # Дублируем данные станции с increment line_count
+                        line_count += 1
+                        for s_row in station_rows:
+                            dup_row = s_row.copy()
+                            dup_row['line'] = line_count
+                            processed_rows.append(dup_row)
+                elif station_count in [5, 6]:
+                    # Обработка пятой и шестой станций без изменений
+                    for s_row in station_rows:
+                        processed_rows.append(s_row.copy())
+                elif station_count == 7:
+                    # Обработка седьмой станции и дублирование
+                    for s_row in station_rows:
+                        processed_rows.append(s_row.copy())
+                    # Проверяем наличие данных после текущей станции и отсутствие смены прибора или даты
+                    if idx + 1 < len(df) and df.iloc[idx + 1]['instrument_serial_number'] == instrument and \
+                            df.iloc[idx + 1]['created'] == created:
+                        line_count += 1
+                        for s_row in station_rows:
+                            dup_row = s_row.copy()
+                            dup_row['line'] = line_count
+                            processed_rows.append(dup_row)
+                elif station_count in [8, 9]:
+                    # Обработка восьмой и девятой станций без изменений
+                    for s_row in station_rows:
+                        processed_rows.append(s_row.copy())
+                elif station_count == 10:
+                    # Обработка десятой станции без изменений
+                    for s_row in station_rows:
+                        processed_rows.append(s_row.copy())
+
+                # Дублирование измерений после определенных станций
+                if station_count == 3:
+                    # После третьей станции дублируем вторую и третью
+                    line_count += 1
+                    for s_count in [2, 3]:
+                        if s_count in stations_data:
+                            for s_row in stations_data[s_count]:
+                                dup_row = s_row.copy()
+                                dup_row['line'] = line_count
+                                processed_rows.append(dup_row)
+                elif station_count == 6:
+                    # После шестой станции дублируем пятую и шестую
+                    line_count += 1
+                    for s_count in [5, 6]:
+                        if s_count in stations_data:
+                            for s_row in stations_data[s_count]:
+                                dup_row = s_row.copy()
+                                dup_row['line'] = line_count
+                                processed_rows.append(dup_row)
+                elif station_count == 9:
+                    # После девятой станции дублируем восьмую и девятую
+                    line_count += 1
+                    for s_count in [8, 9]:
+                        if s_count in stations_data:
+                            for s_row in stations_data[s_count]:
+                                dup_row = s_row.copy()
+                                dup_row['line'] = line_count
+                                processed_rows.append(dup_row)
+
+                # Инкрементируем счетчик станций и обновляем переменные
+                station_count += 1
                 station_name = current_station
-                survey_count = 1
+                station_rows = []
                 row['line'] = line_count
-                temp_rows.append(row.copy())
-                processed_rows.append(row.copy())
+                station_rows.append(row.copy())
+
+        # Обработка последней станции после завершения цикла
+        if station_rows:
+            stations_data[station_count] = station_rows.copy()
+            # Обрабатываем данные последней станции
+            if station_count == 1:
+                for s_row in station_rows:
+                    processed_rows.append(s_row.copy())
+            elif station_count in [2, 3]:
+                for s_row in station_rows:
+                    processed_rows.append(s_row.copy())
+            elif station_count == 4:
+                for s_row in station_rows:
+                    processed_rows.append(s_row.copy())
+                # Проверяем наличие данных после текущей станции и отсутствие смены прибора или даты
+                # В данном случае idx будет равен последнему индексу, поэтому idx + 1 >= len(df)
+                # Дублирование не произойдет, если данных после текущей станции нет или изменился прибор/дата
+                if idx + 1 < len(df) and df.iloc[idx + 1]['instrument_serial_number'] == instrument and \
+                        df.iloc[idx + 1]['created'] == created:
+                    line_count += 1
+                    for s_row in station_rows:
+                        dup_row = s_row.copy()
+                        dup_row['line'] = line_count
+                        processed_rows.append(dup_row)
+            elif station_count in [5, 6]:
+                for s_row in station_rows:
+                    processed_rows.append(s_row.copy())
+            elif station_count == 7:
+                for s_row in station_rows:
+                    processed_rows.append(s_row.copy())
+                # Проверяем наличие данных после текущей станции и отсутствие смены прибора или даты
+                if idx + 1 < len(df) and df.iloc[idx + 1]['instrument_serial_number'] == instrument and \
+                        df.iloc[idx + 1]['created'] == created:
+                    line_count += 1
+                    for s_row in station_rows:
+                        dup_row = s_row.copy()
+                        dup_row['line'] = line_count
+                        processed_rows.append(dup_row)
+            elif station_count in [8, 9]:
+                for s_row in station_rows:
+                    processed_rows.append(s_row.copy())
+            elif station_count == 10:
+                for s_row in station_rows:
+                    processed_rows.append(s_row.copy())
+
+            # Дублирование после девятой станции
+            if station_count == 9:
+                # Проверяем наличие данных после текущей станции и отсутствие смены прибора или даты
+                if idx + 1 < len(df) and df.iloc[idx + 1]['instrument_serial_number'] == instrument and \
+                        df.iloc[idx + 1]['created'] == created:
+                    line_count += 1
+                    for s_count in [8, 9]:
+                        if s_count in stations_data:
+                            for s_row in stations_data[s_count]:
+                                dup_row = s_row.copy()
+                                dup_row['line'] = line_count
+                                processed_rows.append(dup_row)
 
         df_processed = pd.DataFrame(processed_rows)
         df_processed.reset_index(drop=True, inplace=True)
