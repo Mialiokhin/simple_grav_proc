@@ -293,7 +293,7 @@ class SurveyDataTab:
             self.table.h_scroll.pack_forget()
 
         # Отображаем данные в таблице
-        self.table = InputDataTable(self.table_frame, self.data)
+        self.table = InputDataTable(self.table_frame, self.data, data_modified_callback=self.on_data_modified)
 
         # Обновляем списки в Listbox
         self.update_station_listbox()
@@ -457,6 +457,7 @@ class SurveyDataTab:
             new_pressure_str = self.pressure_entry.get().strip()
 
             changes_made = False  # Флаг, указывающий на наличие изменений
+            pressure_changed = False  # Флаг, указывающий на изменение давления
 
             # Проверяем и обновляем название станции, если введено новое имя и оно отличается
             if new_station_name and new_station_name != \
@@ -498,6 +499,10 @@ class SurveyDataTab:
                     if pd.isnull(current_pressure) or new_pressure != current_pressure:
                         self.data.loc[self.data['series_id'] == series_id, 'pressure'] = new_pressure
                         changes_made = True
+                        pressure_changed = True  # Устанавливаем флаг изменения давления
+                    else:
+                        # Давление не изменилось
+                        pass
                 except ValueError:
                     self.display_message("Пожалуйста, введите корректное числовое значение для давления.",
                                          message_type="warning")
@@ -506,6 +511,41 @@ class SurveyDataTab:
             if changes_made:
                 # Обновляем series_id
                 self.update_series_id()
+
+                # Дополнительная обработка давления для других серий только если давление было изменено
+                if pressure_changed:
+                    updated_series_data = self.data[self.data['series_id'] == series_id]
+                    if not updated_series_data.empty:
+                        # Убедимся, что date_time в формате datetime
+                        if not pd.api.types.is_datetime64_any_dtype(self.data['date_time']):
+                            self.data['date_time'] = pd.to_datetime(self.data['date_time'])
+
+                        updated_series_first_time = self.data.loc[
+                            self.data['series_id'] == series_id, 'date_time'].min()
+                        updated_series_station = updated_series_data['station'].iloc[0]
+                        updated_series_pressure = updated_series_data['pressure'].iloc[0]
+                        updated_series_instrument = updated_series_data['instrument_serial_number'].iloc[0]
+
+                        # Группируем данные по series_id
+                        series_groups = self.data.groupby('series_id')
+
+                        for other_series_id, group in series_groups:
+                            if other_series_id == series_id:
+                                continue  # Пропускаем текущую серию
+                            first_row = group.iloc[0]
+                            other_station = first_row['station']
+                            other_instrument = first_row['instrument_serial_number']
+                            other_first_time = first_row['date_time']
+
+                            # Проверяем условия
+                            if other_station == updated_series_station and other_instrument != updated_series_instrument:
+                                time_diff = abs(other_first_time - updated_series_first_time)
+                                if time_diff <= pd.Timedelta(minutes=15):
+                                    # Обновляем давление в этой серии
+                                    self.data.loc[
+                                        self.data['series_id'] == other_series_id, 'pressure'] = updated_series_pressure
+                                    self.display_message(f"Давление для серии {other_series_id} обновлено.",
+                                                         message_type="success")
 
                 # Обновляем отображение таблицы
                 self.table.update_data(self.data)
@@ -930,3 +970,18 @@ class SurveyDataTab:
             # Получаем актуальные данные из таблицы
             return self.table.get_dataframe()
         return self.data  # Возвращаем исходные данные, если таблица еще не создана
+
+    def on_data_modified(self):
+        """Обработчик изменений данных в таблице."""
+        # Обновляем self.data из таблицы
+        self.data = self.table.get_dataframe()
+
+        # Пересчитываем series_id
+        self.update_series_id()
+
+        # Обновляем таблицу с новыми данными
+        self.table.update_data(self.data)
+
+        # Обновляем списки
+        self.update_station_listbox()
+        self.update_series_listbox()

@@ -3,13 +3,14 @@ from tkinter import messagebox, ttk
 
 
 class InputDataTable:
-    def __init__(self, parent, dataframe):
+    def __init__(self, parent, dataframe, data_modified_callback=None):
         self.parent = parent
-        self.dataframe = dataframe.copy()  # Копируем DataFrame
-        self.tree = None  # Здесь будет таблица
-        self.v_scroll = None  # Вертикальный скролл
-        self.h_scroll = None  # Горизонтальный скролл
-        self.entry_popup = None  # Поле для редактирования ячейки
+        self.dataframe = dataframe.copy()
+        self.data_modified_callback = data_modified_callback  # Добавляем обратный вызов
+        self.tree = None
+        self.v_scroll = None
+        self.h_scroll = None
+        self.entry_popup = None
 
         # Словарь для хранения цвета для каждой станции
         self.station_colors = {}
@@ -54,7 +55,7 @@ class InputDataTable:
 
         # Словарь для хранения номера строк по комбинации линии и станции
         group_row_numbers = {}
-        current_group_key = None  # Переменная для отслеживания текущей группы (линия, станция)
+        current_group_key = None
 
         # Очищаем цвета станций
         self.station_colors = {}
@@ -151,9 +152,21 @@ class InputDataTable:
 
                 # Приведение типов
                 if self.dataframe[col_name].dtype == "float64":
-                    new_value = float(new_value)
+                    try:
+                        new_value = float(new_value)
+                    except ValueError:
+                        messagebox.showerror("Ошибка", "Пожалуйста, введите корректное числовое значение.")
+                        self.entry_popup.destroy()
+                        self.entry_popup = None
+                        return
                 elif self.dataframe[col_name].dtype == "int64":
-                    new_value = int(new_value)
+                    try:
+                        new_value = int(new_value)
+                    except ValueError:
+                        messagebox.showerror("Ошибка", "Пожалуйста, введите корректное целочисленное значение.")
+                        self.entry_popup.destroy()
+                        self.entry_popup = None
+                        return
 
                 self.dataframe.at[row_index, col_name] = new_value
 
@@ -164,11 +177,18 @@ class InputDataTable:
 
                     self.dataframe.reset_index(drop=True, inplace=True)
                     self.setup_table()
+                    # Вызываем обратный вызов
+                    if self.data_modified_callback:
+                        self.data_modified_callback()
                     return  # Уже обновлено, выходим из функции
 
             # Закрываем поле редактирования
             self.entry_popup.destroy()
             self.entry_popup = None
+
+            # Вызываем обратный вызов после изменения данных
+            if self.data_modified_callback:
+                self.data_modified_callback()
 
     def delete_selected_rows(self, event=None):
         """Удаление выбранных строк и обновление нумерации."""
@@ -188,6 +208,10 @@ class InputDataTable:
 
             # Очищаем дерево и пересоздаем таблицу
             self.setup_table()
+
+            # Вызываем обратный вызов после изменения данных
+            if self.data_modified_callback:
+                self.data_modified_callback()
 
     def get_dataframe(self):
         """Возвращаем DataFrame с изменениями."""
