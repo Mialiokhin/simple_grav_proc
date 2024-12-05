@@ -244,7 +244,7 @@ class SurveyDataTab:
                 data_files = [stack.enter_context(open(file, 'r', encoding='utf-8')) for file in files]
                 raw_data = read_data(data_files)
 
-            self.data = make_frame_to_proc(raw_data)
+            self.data = make_frame_to_proc(raw_data).copy()
         except Exception as e:
             self.display_message(f"Не удалось загрузить данные: {e}", message_type="error")
             return
@@ -262,7 +262,7 @@ class SurveyDataTab:
 
         # Добавляем колонку для атмосферного давления, если её нет
         if 'pressure' not in self.data.columns:
-            self.data['pressure'] = None
+            self.data.loc[:, 'pressure'] = None
 
         # Если таблица уже существует, удаляем её перед созданием новой
         if self.table:
@@ -280,6 +280,7 @@ class SurveyDataTab:
     def update_series_id(self):
         """Обновление столбца 'series_id' на основе текущих данных"""
         if self.data is not None:
+            self.data = self.data.copy()
             self.data['series_id'] = (
                 self.data[['station', 'instrument_serial_number', 'created', 'line']]
                 .ne(self.data[['station', 'instrument_serial_number', 'created', 'line']].shift())
@@ -557,7 +558,7 @@ class SurveyDataTab:
 
                 # Добавляем колонку 'pressure_corr', если её нет
                 if 'pressure_corr' not in self.data.columns:
-                    self.data['pressure_corr'] = 0.0
+                    self.data.loc[:, 'pressure_corr'] = 0.0
 
                 # Применяем поправку для каждой серии
                 for idx, correction in pressure_corrections.items():
