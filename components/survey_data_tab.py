@@ -130,12 +130,23 @@ class SurveyDataTab:
         self.pressure_entry_station = tk.Entry(station_name_pressure_frame, width=20)
         self.pressure_entry_station.pack(side='left')
 
-        # Объединённая кнопка сохранения для станций
+        # Фрейм для кнопок управления станцией
+        station_buttons_frame = tk.Frame(self.edit_station_frame)
+        station_buttons_frame.pack(pady=5)
+
+        # Кнопка сохранения изменений станции
         self.save_station_changes_button = tk.Button(
-            self.edit_station_frame, text="Save Changes",
+            station_buttons_frame, text="Save Changes",
             command=self.save_station_changes
         )
-        self.save_station_changes_button.pack(pady=5)
+        self.save_station_changes_button.pack(side='left', padx=5)
+
+        # Кнопка удаления станции
+        self.delete_station_button = tk.Button(
+            station_buttons_frame, text="Delete",
+            command=self.delete_station
+        )
+        self.delete_station_button.pack(side='left', padx=5)
 
         # Фрейм для редактирования серий
         self.edit_series_frame = tk.Frame(controls_frame)
@@ -179,12 +190,23 @@ class SurveyDataTab:
         self.pressure_entry = tk.Entry(series_name_pressure_frame, width=20)
         self.pressure_entry.pack(side='left')
 
-        # Объединённая кнопка сохранения для серий
+        # Фрейм для кнопок управления серией
+        series_buttons_frame = tk.Frame(self.edit_series_frame)
+        series_buttons_frame.pack(pady=5)
+
+        # Кнопка сохранения изменений серии
         self.save_series_changes_button = tk.Button(
-            self.edit_series_frame, text="Save Changes",
+            series_buttons_frame, text="Save Changes",
             command=self.save_series_changes
         )
-        self.save_series_changes_button.pack(pady=5)
+        self.save_series_changes_button.pack(side='left', padx=5)
+
+        # Кнопка удаления серии
+        self.delete_series_button = tk.Button(
+            series_buttons_frame, text="Delete",
+            command=self.delete_series
+        )
+        self.delete_series_button.pack(side='left', padx=5)
 
         # Добавляем фрейм для сообщений и размещаем его внизу
         message_frame = tk.Frame(controls_frame)
@@ -401,6 +423,29 @@ class SurveyDataTab:
         else:
             self.display_message("Пожалуйста, выберите станцию для изменения.", message_type="warning")
 
+    def delete_station(self):
+        """Удаление выбранной станции"""
+        selected_index = self.station_listbox.curselection()
+        if selected_index:
+            station_name = self.station_listbox.get(selected_index)
+            # Удаляем данные станции из DataFrame
+            self.data = self.data[self.data['station'] != station_name].copy()
+            # Обновляем series_id после удаления
+            self.update_series_id()
+            # Обновляем отображение таблицы
+            self.table.update_data(self.data)
+            # Обновляем списки
+            self.update_station_listbox()
+            self.update_series_listbox()
+            # Очищаем поля ввода
+            self.rename_station_entry.delete(0, tk.END)
+            self.station_lat_entry.delete(0, tk.END)
+            self.station_lon_entry.delete(0, tk.END)
+            self.pressure_entry_station.delete(0, tk.END)
+            self.display_message(f"Станция '{station_name}' успешно удалена.", message_type="success")
+        else:
+            self.display_message("Пожалуйста, выберите станцию для удаления.", message_type="warning")
+
     def save_series_changes(self):
         """Сохранение изменений серии: переименование станции, координат и давления"""
         selected_index = self.series_listbox.curselection()
@@ -480,6 +525,29 @@ class SurveyDataTab:
                 self.display_message("Нет изменений для сохранения.", message_type="success")
         else:
             self.display_message("Пожалуйста, выберите серию для изменения.", message_type="warning")
+
+    def delete_series(self):
+        """Удаление выбранной серии"""
+        selected_index = self.series_listbox.curselection()
+        if selected_index:
+            series_id = self.data['series_id'].unique()[selected_index[0]]
+            # Удаляем данные серии из DataFrame
+            self.data = self.data[self.data['series_id'] != series_id].copy()
+            # Обновляем series_id после удаления
+            self.update_series_id()
+            # Обновляем отображение таблицы
+            self.table.update_data(self.data)
+            # Обновляем списки
+            self.update_station_listbox()
+            self.update_series_listbox()
+            # Очищаем поля ввода
+            self.series_station_entry.delete(0, tk.END)
+            self.series_lat_entry.delete(0, tk.END)
+            self.series_lon_entry.delete(0, tk.END)
+            self.pressure_entry.delete(0, tk.END)
+            self.display_message(f"Серия {series_id} успешно удалена.", message_type="success")
+        else:
+            self.display_message("Пожалуйста, выберите серию для удаления.", message_type="warning")
 
     def on_station_select(self, event):
         """Обработчик выбора станции в Listbox"""
