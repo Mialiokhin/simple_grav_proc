@@ -590,7 +590,7 @@ class SurveyDataTab:
                 date = pd.to_datetime(row['date_time'])
 
                 # Рассчитываем новую приливную поправку с использованием функции TIDEFF
-                new_tide_corr = TIDEFF(lat, lon, date.day, date.month, date.year, date.hour, date.minute)
+                new_tide_corr = - TIDEFF(lat, lon, date.day, date.month, date.year, date.hour, date.minute)
 
                 # Обновляем значение в колонке 'tide_corr'
                 self.data.at[idx, 'corr_grav'] = row['corr_grav'] - row.get('tide_corr', 0) + new_tide_corr
