@@ -39,6 +39,13 @@ class TiesTab:
         self.plot_check = tk.Checkbutton(controls_frame, text="Plot residuals", variable=self.plot_var)
         self.plot_check.grid(row=3, column=0, padx=5, pady=5, sticky="w")
 
+        # Флажок для построения графиков по линиям
+        self.plots_by_lines_var = tk.BooleanVar()
+        self.plots_by_lines_check = tk.Checkbutton(controls_frame, text="Plots by lines",
+                                                   variable=self.plots_by_lines_var)
+        self.plots_by_lines_check.grid(row=3, column=1, padx=5, pady=5,
+                                       sticky="w")  # Расположен справа от Plot residuals
+
         # Флажок для создания карты
         self.map_var = tk.BooleanVar()
         self.map_check = tk.Checkbutton(controls_frame, text="Create map", variable=self.map_var)
@@ -162,7 +169,7 @@ class TiesTab:
                 self.graphs_notebook.add(canvas_frame, text="Residuals")
 
                 # Проверяем, есть ли больше одной линии
-                if len(data['line'].unique()) > 1:
+                if len(data['line'].unique()) > 1 and self.plots_by_lines_var.get():
                     # Создание отдельной папки для графиков по линиям
                     line_plots_dir = os.path.join(result_dir, "residuals_plots_by_lines")
                     os.makedirs(line_plots_dir, exist_ok=True)
@@ -191,5 +198,3 @@ class TiesTab:
             messagebox.showinfo("Successfully", f"The calculation of the ties is completed!")
         except Exception as e:
             messagebox.showerror("Error", f"Error in calculating ties: {e}")
-
-
