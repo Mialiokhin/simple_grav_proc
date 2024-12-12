@@ -1,81 +1,56 @@
 import numpy as np
 import pandas as pd
-from grav_proc.calculations import get_ties_sum  # Импорт функции для подсчета суммы связей
+from grav_proc.calculations import get_ties_sum, process_reverse_ties  # Импорт функции для подсчета суммы связей
 
 
-# Функция для генерации отчета на основе связей (ties)
 def get_report(ties):
     # Указываем необходимые столбцы для отчета
     columns = [
-        'station_from',  # * Начальная станция
-        'station_to',  # * Конечная станция
-        'date_time',  # Время
-        'survey_name',  # Имя измерения
-        'operator',  # Оператор
-        'meter_type',  # Тип прибора
-        'instrument_serial_number',  # * Серийный номер прибора
-        # 'line',                     # * Линия (не используется, закомментировано)
-        'instr_height_from',  # Высота начальной точки
-        'instr_height_to',  # Высота конечной точки
-        'tie',  # * Связь между станциями
-        'err'  # * Ошибка измерения
+        'station_from', 'station_to', 'date_time', 'survey_name', 'operator',
+        'meter_type', 'instrument_serial_number', 'instr_height_from',
+        'instr_height_to', 'tie', 'err'
     ]
-    # Заголовки для итогового отчета
     headers = [
-        'From',  # Начальная станция
-        'To',  # Конечная станция
-        'Date',  # Время измерения
-        'Survey',  # Имя измерения
-        'Operator',  # Оператор
-        'Meter',  # Тип прибора
-        'S/N',  # Серийный номер прибора
-        # 'Line',                   # Линия (закомментировано)
-        'Height From (mm)',  # Высота начальной станции (в мм)
-        'Height To (mm)',  # Высота конечной станции (в мм)
-        'Tie (uGal)',  # Значение связи (в микрогалах)
-        'SErr (uGal)'  # Стандартная ошибка (в микрогалах)
+        'From', 'To', 'Date', 'Survey', 'Operator', 'Meter', 'S/N',
+        'Height From (mm)', 'Height To (mm)', 'Tie (uGal)', 'SErr (uGal)'
     ]
 
-    # Начальная строка для отчета
-    report = f'\nThe mean ties between the stations:\n==================================='
-
-    # Замена NaN на None для корректной обработки
+    # Основная таблица привязок
     ties = ties.replace(np.nan, None)
+    ties_table = ties[columns].to_markdown(index=False, headers=headers, tablefmt="simple", floatfmt=".1f")
+    report = f'\nThe mean ties between the stations:\n===================================\n{ties_table}'
 
-    # Преобразование DataFrame в таблицу с форматированием
-    ties_table = ties[columns].to_markdown(
-        index=False,  # Без индексов
-        headers=headers,  # Указание заголовков таблицы
-        tablefmt="simple",  # Формат таблицы
-        floatfmt=".1f")  # Формат для числовых значений
+    # Обработка обратных связей
+    table_by_date, table_by_sn = process_reverse_ties(ties)
 
-    # Добавление таблицы в отчет
-    report = f'{report}\n{ties_table}'
+    if table_by_date:
+        report += f'\n\nMean values for reverse ties (by date and serial number):\n=============================\n{table_by_date}'
 
-    # Инициализация DataFrame для хранения сумм
+    if table_by_sn:
+        report += f'\n\nMean values for reverse ties (by serial number only):\n=============================\n{table_by_sn}'
+
+    # Суммы связей
     ties_sums = pd.DataFrame()
-
-    # Группировка данных по серийному номеру прибора
     group_by_meters = ties.groupby('instrument_serial_number')
-
-    # Для каждого прибора вычисляем сумму связей
     for meter, meter_ties in group_by_meters:
         meter_ties_sums = get_ties_sum(meter_ties)
         if len(meter_ties_sums):
             ties_sums = pd.concat([ties_sums, meter_ties_sums])
 
-    # Если есть данные по суммам, добавляем их в отчет
     if len(ties_sums):
         report = f'{report}\n\nSum of the cicle ties:\n======================\n'
-        headers = ['Meter', 'Cicles', 'Sum (uGal)']  # Заголовки для сумм
+        headers = ['Meter', 'Cicles', 'Sum (uGal)']
         sums_table = ties_sums.to_markdown(
             index=False,
             headers=headers,
             tablefmt="simple",
-            floatfmt=".2f")  # Формат для числовых значений с двумя знаками после запятой
+            floatfmt=".2f"
+        )
         report = report + sums_table
 
-    return report  # Возвращаем итоговый отчет
+    return report
+
+
 
 
 # Функция для создания CSV файла для утилиты vg_fit

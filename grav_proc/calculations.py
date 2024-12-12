@@ -514,6 +514,104 @@ def get_ties_sum(ties):
     return cicles
 
 
+def process_reverse_ties(ties):
+    """
+    Обрабатывает данные обратных связей и формирует таблицы для отчета.
+
+    :param ties: DataFrame с данными о связях
+    :return: tuple (таблица по дате и серийным номерам, таблица только по серийным номерам)
+    """
+    # Создание пары станций
+    ties['pair_key'] = ties.apply(
+        lambda x: tuple(sorted([x['station_from'], x['station_to']])), axis=1
+    )
+
+    # Приведение связей к единому направлению
+    ties['adjusted_tie'] = ties.apply(
+        lambda x: x['tie'] if x['station_from'] < x['station_to'] else -x['tie'], axis=1
+    )
+
+    # Проверка на наличие обратных связей
+    reverse_check = ties.groupby(['pair_key', 'date_time', 'instrument_serial_number']).size()
+
+    # Оставляем только пары с обратной связью
+    valid_pairs = reverse_check[reverse_check > 1].index
+    filtered_ties = ties[
+        ties.set_index(['pair_key', 'date_time', 'instrument_serial_number']).index.isin(valid_pairs)
+    ]
+
+    if filtered_ties.empty:
+        return None, None
+
+    # Группировка для вычисления среднего значения (по дате и серийному номеру)
+    grouped = filtered_ties.groupby(['pair_key', 'date_time', 'instrument_serial_number'])
+    averaged = grouped.agg({
+        'station_from': 'first',
+        'station_to': 'first',
+        'date_time': 'first',
+        'survey_name': 'first',
+        'instrument_serial_number': 'first',
+        'adjusted_tie': 'mean',
+        'err': 'mean'
+    }).reset_index(drop=True)
+
+    # Приводим к правильному направлению для `adjusted_tie`
+    averaged['adjusted_tie'] = averaged.apply(
+        lambda x: x['adjusted_tie'] if x['station_from'] < x['station_to'] else -x['adjusted_tie'], axis=1
+    )
+
+    # Округление результатов
+    averaged['adjusted_tie'] = np.around(averaged['adjusted_tie'], decimals=1)
+    averaged['err'] = np.around(averaged['err'], decimals=1)
+
+    # Сортировка
+    averaged = averaged.sort_values(by=['instrument_serial_number', 'date_time'])
+
+    # Формирование таблицы по дате и серийному номеру
+    table_by_date = averaged[[
+        'station_from', 'station_to', 'date_time', 'survey_name', 'instrument_serial_number', 'adjusted_tie', 'err'
+    ]].to_markdown(
+        index=False,
+        headers=['From', 'To', 'Date', 'Survey', 'S/N', 'Mean Tie (uGal)', 'Mean SErr (uGal)'],
+        tablefmt="simple",
+        floatfmt=".1f"
+    )
+
+    # Группировка только по серийному номеру
+    grouped_no_date = filtered_ties.groupby(['pair_key', 'instrument_serial_number'])
+    averaged_no_date = grouped_no_date.agg({
+        'station_from': 'first',
+        'station_to': 'first',
+        'instrument_serial_number': 'first',
+        'adjusted_tie': 'mean',
+        'err': 'mean'
+    }).reset_index(drop=True)
+
+    # Приводим к правильному направлению для `adjusted_tie`
+    averaged_no_date['adjusted_tie'] = averaged_no_date.apply(
+        lambda x: x['adjusted_tie'] if x['station_from'] < x['station_to'] else -x['adjusted_tie'], axis=1
+    )
+
+    # Округление результатов
+    averaged_no_date['adjusted_tie'] = np.around(averaged_no_date['adjusted_tie'], decimals=1)
+    averaged_no_date['err'] = np.around(averaged_no_date['err'], decimals=1)
+
+    # Сортировка по серийному номеру
+    averaged_no_date = averaged_no_date.sort_values(by=['instrument_serial_number'])
+
+    # Формирование таблицы только по серийному номеру
+    table_by_sn = averaged_no_date[[
+        'station_from', 'station_to', 'instrument_serial_number', 'adjusted_tie', 'err'
+    ]].to_markdown(
+        index=False,
+        headers=['From', 'To', 'S/N', 'Mean Tie (uGal)', 'Mean SErr (uGal)'],
+        tablefmt="simple",
+        floatfmt=".1f"
+    )
+
+    return table_by_date, table_by_sn
+
+
 # Функция реверса привязки
 def reverse_tie(tie):
     ''' Reverse of tie (from -> to, to -> from, tie = - tie) '''
