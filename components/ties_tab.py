@@ -2,6 +2,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk, PanedWindow
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
 from grav_proc.calculations import fit_by_meter_created
 from grav_proc.reports import get_report
 from grav_proc.plots import residuals_plot, get_map
@@ -148,16 +149,31 @@ class TiesTab:
 
             # Проверка на необходимость построения графика остатков
             if self.plot_var.get():
+                # Создание общего графика остатков
                 fig = residuals_plot(data)
                 # Сохраняем график остатков
                 fig.savefig(os.path.join(result_dir, f"{survey_name}_residuals.png"))
 
-                # Отображаем график в новом фрейме внутри Notebook
+                # Отображаем общий график в новом фрейме внутри Notebook
                 canvas_frame = tk.Frame(self.graphs_notebook)
                 canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
                 canvas.draw()
                 canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
                 self.graphs_notebook.add(canvas_frame, text="Residuals")
+
+                # Проверяем, есть ли больше одной линии
+                if len(data['line'].unique()) > 1:
+                    # Создание отдельной папки для графиков по линиям
+                    line_plots_dir = os.path.join(result_dir, "residuals_plots_by_lines")
+                    os.makedirs(line_plots_dir, exist_ok=True)
+
+                    # Построение и сохранение графиков по линиям
+                    for (line, meter), line_data in data.groupby(['line', 'instrument_serial_number']):
+                        line_fig = residuals_plot(line_data)
+                        meter_suffix = str(meter)[-3:]  # Последние три цифры номера прибора
+                        line_file = f"{survey_name}-{meter_suffix}-line_{line}.png"
+                        line_fig.savefig(os.path.join(line_plots_dir, line_file))
+                        plt.close(line_fig)
 
             # Проверка на необходимость создания карты
             if self.map_var.get():
@@ -175,3 +191,5 @@ class TiesTab:
             messagebox.showinfo("Successfully", f"The calculation of the ties is completed!")
         except Exception as e:
             messagebox.showerror("Error", f"Error in calculating ties: {e}")
+
+
