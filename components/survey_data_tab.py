@@ -27,6 +27,7 @@ class SurveyDataTab:
         self.current_series_lat = None
         self.current_series_lon = None
         self.current_series_pressure = None
+        self.current_series_line = None
 
         # Левый фрейм для таблицы
         self.table_frame = tk.Frame(self.frame)
@@ -189,6 +190,15 @@ class SurveyDataTab:
         self.pressure_label.pack(side='left', padx=(0, 5))
         self.pressure_entry = tk.Entry(series_name_pressure_frame, width=20)
         self.pressure_entry.pack(side='left')
+
+        # Субфрейм для линии (в одну строчку)
+        series_line_frame = tk.Frame(self.edit_series_frame)
+        series_line_frame.pack(pady=2)
+
+        self.series_line_label = tk.Label(series_line_frame, text="Line:")
+        self.series_line_label.pack(side='left', padx=(0, 5))
+        self.series_line_entry = tk.Entry(series_line_frame, width=20)
+        self.series_line_entry.pack(side='left', padx=(0, 15))
 
         # Фрейм для кнопок управления серией
         series_buttons_frame = tk.Frame(self.edit_series_frame)
@@ -455,7 +465,7 @@ class SurveyDataTab:
             new_lat_str = self.series_lat_entry.get().strip()
             new_lon_str = self.series_lon_entry.get().strip()
             new_pressure_str = self.pressure_entry.get().strip()
-
+            new_line_str = self.series_line_entry.get().strip()
             changes_made = False  # Флаг, указывающий на наличие изменений
             pressure_changed = False  # Флаг, указывающий на изменение давления
 
@@ -463,6 +473,12 @@ class SurveyDataTab:
             if new_station_name and new_station_name != \
                     self.data.loc[self.data['series_id'] == series_id, 'station'].iloc[0]:
                 self.data.loc[self.data['series_id'] == series_id, 'station'] = new_station_name
+                changes_made = True
+
+            # Проверяем и обновляем линию, если введена новая линия и она отличается
+            if new_line_str and new_line_str != \
+                    self.data.loc[self.data['series_id'] == series_id, 'line'].iloc[0]:
+                self.data.loc[self.data['series_id'] == series_id, 'line'] = new_line_str
                 changes_made = True
 
             # Проверяем и обновляем широту, если введено новое значение и оно отличается
@@ -628,7 +644,10 @@ class SurveyDataTab:
                 self.current_series_lat = series_data.iloc[0]['lat']
                 self.current_series_lon = series_data.iloc[0]['lon']
                 self.current_series_pressure = series_data.iloc[0].get('pressure', None)
+                self.current_series_line = series_data.iloc[0].get('line', None)
                 # Заполняем поля ввода координат, названия станции и давления
+                self.series_line_entry.delete(0, tk.END)
+                self.series_line_entry.insert(0, str(self.current_series_line))
                 self.series_lat_entry.delete(0, tk.END)
                 self.series_lat_entry.insert(0, str(self.current_series_lat))
                 self.series_lon_entry.delete(0, tk.END)
