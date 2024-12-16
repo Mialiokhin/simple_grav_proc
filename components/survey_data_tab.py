@@ -476,10 +476,17 @@ class SurveyDataTab:
                 changes_made = True
 
             # Проверяем и обновляем линию, если введена новая линия и она отличается
-            if new_line_str and new_line_str != \
-                    self.data.loc[self.data['series_id'] == series_id, 'line'].iloc[0]:
-                self.data.loc[self.data['series_id'] == series_id, 'line'] = new_line_str
-                changes_made = True
+            if new_line_str:
+                try:
+                    new_line = int(new_line_str)
+                    current_line = self.data.loc[self.data['series_id'] == series_id, 'line'].iloc[0]
+                    if new_line != current_line:
+                        self.data.loc[self.data['series_id'] == series_id, 'line'] = new_line
+                        changes_made = True
+                except ValueError:
+                    self.display_message("Пожалуйста, введите корректное числовое значение для линии.",
+                                         message_type="warning")
+                    return
 
             # Проверяем и обновляем широту, если введено новое значение и оно отличается
             if new_lat_str:
