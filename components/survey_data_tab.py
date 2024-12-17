@@ -72,6 +72,10 @@ class SurveyDataTab:
         )
         self.calc_pressure_button.pack(side='left', padx=5)
 
+        # Добавляем кнопку "Check" в интерфейс
+        self.check_button = tk.Button(buttons_frame, text="Check", command=self.checks)
+        self.check_button.pack(side='left', padx=5)
+
         # Переключатель режима: Edit Station или Edit Series
         mode_frame = tk.Frame(controls_frame)
         mode_frame.pack(pady=5)
@@ -980,6 +984,61 @@ class SurveyDataTab:
         self.display_message("Данные успешно обработаны для программы измерений ГРС2.", message_type="success")
 
         return df_processed
+
+    def checks(self):
+        """Проверка расхождений в координатах для каждой станции среди серий и замыкания линий."""
+        if self.data is not None:
+            errors = []  # Список для хранения предупреждений о координатах
+            line_closure_errors = []  # Список для ошибок замыкания линий
+            grouped_by_station = self.data.groupby('station')  # Группируем данные по станции
+            grouped_by_line = self.data.groupby('line')  # Группируем данные по линии
+            threshold = 0.001  # Порог для стандартного отклонения
+
+            # Проверка расхождений в координатах
+            for station, group in grouped_by_station:
+                # Расчет средней широты и долготы
+                lat_mean = group['lat'].mean()
+                lat_std = group['lat'].std()
+                lon_mean = group['lon'].mean()
+                lon_std = group['lon'].std()
+
+                # Проверяем, превышает ли стандартное отклонение допустимый порог
+                if lat_std > threshold or lon_std > threshold:
+                    # Добавляем предупреждение в список
+                    errors.append(
+                        f"Станция '{station}': "
+                        f"lat_std={lat_std:.6f}, lon_std={lon_std:.6f}. "
+                        f"Серии: {', '.join(map(str, group['series_id'].unique()))}"
+                    )
+
+            # Проверка замыкания линий
+            for line, group in grouped_by_line:
+                # Получаем названия станций первой и последней серии в линии
+                first_station = group.iloc[0]['station']
+                last_station = group.iloc[-1]['station']
+
+                # Если названия не совпадают, добавляем в список ошибок
+                if first_station != last_station:
+                    line_closure_errors.append(
+                        f"Линия {line}: первая станция '{first_station}' не совпадает с последней станцией '{last_station}'."
+                    )
+
+            # Формирование сообщений
+            messages = []
+
+            if errors:
+                messages.append("Обнаружены расхождения в координатах:\n" + "\n".join(errors))
+            else:
+                messages.append("Координаты для всех станций 一 соответствуют.")
+
+            if line_closure_errors:
+                messages.append("Линии, которые не замыкаются:\n" + "\n".join(line_closure_errors))
+            else:
+                messages.append("Все линии замыкаются корректно.")
+
+            # Отображение сообщений
+            self.display_message("\n\n".join(messages),
+                                 message_type="error" if errors or line_closure_errors else "success")
 
     def load_coeff_files(self):
         """Загрузка файлов коэффициентов"""
