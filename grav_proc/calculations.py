@@ -655,18 +655,14 @@ def to_seconds(value):
 def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degree=2, method='WLS', confidence_interval=100):
     # Создание матрицы наблюдений для станций
     observation_matrix = pd.get_dummies(stations).drop(fix_station, axis=1)
-    # defined_stations = observation_matrix.columns
-
-    # date_time = date_time - date_time.iloc[0]
 
     # Создание временной матрицы (полиностепенной)
     time_matrix = np.vander(date_time, max_degree)
 
     # Дизайн-матрица для моделирования
     design_matrix = np.hstack((observation_matrix, time_matrix))
-    # model = sm.RLM(input_grav, design_matrix)
 
-    # Выбор метода для моделирования: RLM или WLS
+    # Выбор метода для моделирования
     match method:
         case 'RLM':
             model = sm.RLM(gravity, design_matrix)
@@ -682,15 +678,18 @@ def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degre
     residuals = result.resid
     lower_bound = np.percentile(residuals, (100 - confidence_interval) / 2)
     upper_bound = np.percentile(residuals, 100 - (100 - confidence_interval) / 2)
-
+    print(lower_bound)
+    print(upper_bound)
     filtered_indices = (residuals >= lower_bound) & (residuals <= upper_bound)
 
-    # Проверка количества оставшихся данных после фильтрации
-    if filtered_indices.sum() == 0:
-        print("Warning: No data points remain after filtering by confidence interval. Returning original results.")
-        return result.params, residuals
+    # Считаем оставшиеся и общее количество измерений
+    remaining_measurements = filtered_indices.sum()
+    total_measurements = len(residuals)
 
-    print(f"Number of points after filtering: {filtered_indices.sum()} out of {len(residuals)}")
+    # Если данных не осталось, возвращаем предупреждение
+    if remaining_measurements == 0:
+        print("Warning: No data points remain after filtering by confidence interval. Returning original results.")
+        return result.params, residuals, f"{remaining_measurements}/{total_measurements}"
 
     # Фильтрация данных
     filtered_stations = stations[filtered_indices]
@@ -726,12 +725,15 @@ def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degre
             pd.DataFrame({
                 'station_from': fix_station,
                 'station_to': station,
-                'tie': result_filtered.params.iloc[index],
-                'err': result_filtered.bse.iloc[index]
+                'tie': result_filtered.params[index],
+                'err': result_filtered.bse[index],
+                'remaining_total': f"{remaining_measurements}/{total_measurements}"  # Добавляем Remaining/Total
             }, index=[0])
         ], ignore_index=True)
 
     return ties, result_filtered.resid
+
+
 
 # Функция для подбора дрифта по станциям
 def drift_fitting(stations, grav, std_err, date_time, fix_station=None, max_degree=2):

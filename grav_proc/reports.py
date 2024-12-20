@@ -8,11 +8,12 @@ def get_report(ties):
     columns = [
         'station_from', 'station_to', 'date_time', 'survey_name', 'operator',
         'meter_type', 'instrument_serial_number', 'instr_height_from',
-        'instr_height_to', 'tie', 'err'
+        'instr_height_to', 'tie', 'err', 'remaining_total'
     ]
     headers = [
         'From', 'To', 'Date', 'Survey', 'Operator', 'Meter', 'S/N',
-        'Height From (mm)', 'Height To (mm)', 'Tie (uGal)', 'SErr (uGal)'
+        'Height From (mm)', 'Height To (mm)', 'Tie (uGal)', 'SErr (uGal)',
+        '(Remaining/Total)'
     ]
 
     # Основная таблица привязок
