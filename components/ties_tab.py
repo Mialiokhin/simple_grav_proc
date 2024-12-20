@@ -51,9 +51,18 @@ class TiesTab:
         self.map_check = tk.Checkbutton(controls_frame, text="Create map", variable=self.map_var)
         self.map_check.grid(row=4, column=0, padx=5, pady=5, sticky="w")
 
+        # Выпадающий список для выбора Confidence Interval
+        ci_label = tk.Label(controls_frame, text="Residual Confidence Interval (%):")
+        ci_label.grid(row=5, column=0, padx=5, pady=5, sticky="w")
+
+        self.ci_var = tk.IntVar(value=100)  # Значение по умолчанию
+        self.ci_combo = ttk.Combobox(controls_frame, textvariable=self.ci_var, state="readonly")
+        self.ci_combo['values'] = list(range(1, 101))  # От 1 до 100
+        self.ci_combo.grid(row=6, column=0, padx=5, pady=5, sticky="w")
+
         # Кнопка запуска расчета (Ties)
         self.ties_button = tk.Button(controls_frame, text="Solve ties", command=self.calculate_ties)
-        self.ties_button.grid(row=5, column=0, padx=5, pady=10)
+        self.ties_button.grid(row=7, column=0, padx=5, pady=10)
 
         # Создаем PanedWindow для разделения окна пополам
         self.main_paned_window = PanedWindow(self.frame, orient=tk.VERTICAL)
@@ -122,6 +131,7 @@ class TiesTab:
         try:
             method = self.method_var.get()
             by_lines = self.by_lines_var.get()
+            confidence_interval = self.ci_var.get()  # Получение выбранного значения Confidence Interval
 
             # Получение данных из вкладки Survey Data
             data = self.survey_data_tab.get_dataframe()
@@ -138,7 +148,8 @@ class TiesTab:
                 return
 
             # Расчет привязок
-            ties = fit_by_meter_created(data, anchor=None, method=method, by_lines=by_lines)
+            ties = fit_by_meter_created(data, anchor=None, method=method, by_lines=by_lines,
+                                        confidence_interval=confidence_interval)
             report = get_report(ties)
 
             # Сохраняем отчет

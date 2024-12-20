@@ -652,14 +652,17 @@ def to_seconds(value):
 
 
 # Функция для оценки свободных привязок и дрифта
-def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degree=2, method='WLS'):
+def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degree=2, method='WLS', confidence_interval=100):
+    # Создание матрицы наблюдений для станций
     observation_matrix = pd.get_dummies(stations).drop(fix_station, axis=1)
-
-    defined_stations = observation_matrix.columns
+    # defined_stations = observation_matrix.columns
 
     # date_time = date_time - date_time.iloc[0]
+
+    # Создание временной матрицы (полиностепенной)
     time_matrix = np.vander(date_time, max_degree)
 
+    # Дизайн-матрица для моделирования
     design_matrix = np.hstack((observation_matrix, time_matrix))
     # model = sm.RLM(input_grav, design_matrix)
 
@@ -675,26 +678,60 @@ def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degre
 
     result = model.fit()
 
+    # Фильтрация данных по доверительному интервалу
+    residuals = result.resid
+    lower_bound = np.percentile(residuals, (100 - confidence_interval) / 2)
+    upper_bound = np.percentile(residuals, 100 - (100 - confidence_interval) / 2)
+
+    filtered_indices = (residuals >= lower_bound) & (residuals <= upper_bound)
+
+    # Проверка количества оставшихся данных после фильтрации
+    if filtered_indices.sum() == 0:
+        print("Warning: No data points remain after filtering by confidence interval. Returning original results.")
+        return result.params, residuals
+
+    print(f"Number of points after filtering: {filtered_indices.sum()} out of {len(residuals)}")
+
+    # Фильтрация данных
+    filtered_stations = stations[filtered_indices]
+    filtered_gravity = gravity[filtered_indices]
+    filtered_date_time = date_time[filtered_indices]
+
+    if std is not None:
+        filtered_std = std[filtered_indices]
+    else:
+        filtered_std = None
+
+    # Перезапуск модели с отфильтрованными данными
+    observation_matrix_filtered = pd.get_dummies(filtered_stations).drop(fix_station, axis=1)
+    time_matrix_filtered = np.vander(filtered_date_time, max_degree)
+    design_matrix_filtered = np.hstack((observation_matrix_filtered, time_matrix_filtered))
+
+    match method:
+        case 'RLM':
+            model_filtered = sm.RLM(filtered_gravity, design_matrix_filtered)
+        case 'WLS':
+            if filtered_std is not None:
+                model_filtered = sm.WLS(filtered_gravity, design_matrix_filtered, weights=1 / filtered_std)
+            else:
+                model_filtered = sm.WLS(filtered_gravity, design_matrix_filtered)
+
+    result_filtered = model_filtered.fit()
+
+    # Создание таблицы связей
     ties = pd.DataFrame()
+    for index, station in enumerate(observation_matrix_filtered.columns):
+        ties = pd.concat([
+            ties,
+            pd.DataFrame({
+                'station_from': fix_station,
+                'station_to': station,
+                'tie': result_filtered.params.iloc[index],
+                'err': result_filtered.bse.iloc[index]
+            }, index=[0])
+        ], ignore_index=True)
 
-    for index, station in enumerate(defined_stations):
-        ties = pd.concat(
-            [
-                ties,
-                pd.DataFrame(
-                    {
-                        'station_from': fix_station,
-                        'station_to': station,
-                        'tie': result.params.iloc[index],
-                        'err': result.bse.iloc[index],
-                        # 'line': f'{fix_station}-{station}'
-                    }, index=[0]
-                )
-            ], ignore_index=True
-        )
-
-    return ties, result.resid
-
+    return ties, result_filtered.resid
 
 # Функция для подбора дрифта по станциям
 def drift_fitting(stations, grav, std_err, date_time, fix_station=None, max_degree=2):
@@ -828,7 +865,7 @@ def get_meter_ties_all(readings):
 
 
 # Основная функция расчета приращений для конкретного прибора и его измерений
-def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False):
+def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False, confidence_interval=100):
     ties = pd.DataFrame()
     fix_station = anchor
 
@@ -858,6 +895,7 @@ def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False):
             std=grouped.std_err,
             max_degree=2,
             method=method,
+            confidence_interval=confidence_interval  # Передаем параметр confidence_interval
         )
         fitgrav['instrument_serial_number'] = meter
         fitgrav['survey_name'] = survey
@@ -883,3 +921,4 @@ def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False):
         ties = pd.concat([ties, fitgrav], ignore_index=True)
 
     return ties
+
