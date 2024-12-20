@@ -291,14 +291,14 @@ def get_ties(readings):
                 begin_date_time = loops[0]['date_time']
                 begin_index = loops[0]['index']
                 factor = (
-                    row.corr_grav - line_readings.loc[begin_index].corr_grav
-                ) / (
-                    dt.timestamp(row.date_time) - dt.timestamp(begin_date_time)
-                )
+                                 row.corr_grav - line_readings.loc[begin_index].corr_grav
+                         ) / (
+                                 dt.timestamp(row.date_time) - dt.timestamp(begin_date_time)
+                         )
                 for reading in loops[1:]:
                     correction = factor * (
-                        dt.timestamp(reading['date_time'])
-                        - dt.timestamp(begin_date_time)
+                            dt.timestamp(reading['date_time'])
+                            - dt.timestamp(begin_date_time)
                     )
                     ties.loc[count] = [
                         begin_date_time,
@@ -652,7 +652,8 @@ def to_seconds(value):
 
 
 # Функция для оценки свободных привязок и дрифта
-def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degree=2, method='WLS', confidence_interval=100):
+def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degree=2, method='WLS',
+                  confidence_interval=100):
     # Создание матрицы наблюдений для станций
     observation_matrix = pd.get_dummies(stations).drop(fix_station, axis=1)
 
@@ -678,8 +679,6 @@ def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degre
     residuals = result.resid
     lower_bound = np.percentile(residuals, (100 - confidence_interval) / 2)
     upper_bound = np.percentile(residuals, 100 - (100 - confidence_interval) / 2)
-    print(lower_bound)
-    print(upper_bound)
     filtered_indices = (residuals >= lower_bound) & (residuals <= upper_bound)
 
     # Считаем оставшиеся и общее количество измерений
@@ -725,14 +724,13 @@ def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degre
             pd.DataFrame({
                 'station_from': fix_station,
                 'station_to': station,
-                'tie': result_filtered.params[index],
-                'err': result_filtered.bse[index],
+                'tie': result_filtered.params.iloc[index],
+                'err': result_filtered.bse.iloc[index],
                 'remaining_total': f"{remaining_measurements}/{total_measurements}"  # Добавляем Remaining/Total
             }, index=[0])
         ], ignore_index=True)
 
     return ties, result_filtered.resid
-
 
 
 # Функция для подбора дрифта по станциям
@@ -923,4 +921,3 @@ def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False, confide
         ties = pd.concat([ties, fitgrav], ignore_index=True)
 
     return ties
-
