@@ -222,6 +222,12 @@ class SurveyDataTab:
         )
         self.delete_series_button.pack(side='left', padx=5)
 
+        self.copy_series_button = tk.Button(
+            series_buttons_frame, text="Copy",
+            command=self.copy_selected_series
+        )
+        self.copy_series_button.pack(side='left', padx=5)
+
         # Добавляем фрейм для сообщений и размещаем его внизу
         message_frame = tk.Frame(controls_frame)
         message_frame.pack(side='bottom', fill='x', pady=10)
@@ -984,6 +990,46 @@ class SurveyDataTab:
         self.display_message("Данные успешно обработаны для программы измерений ГРС2.", message_type="success")
 
         return df_processed
+
+    def copy_selected_series(self):
+        """Дублирует выбранную серию и добавляет копию сразу после неё."""
+        try:
+            # Получаем индекс выбранной серии
+            selected_index = self.series_listbox.curselection()
+            if not selected_index:
+                self.display_message("Пожалуйста, выберите серию для копирования.", message_type="warning")
+                return
+
+            # Определяем ID выбранной серии
+            selected_series_id = self.data['series_id'].unique()[selected_index[0]]
+
+            # Получаем данные выбранной серии
+            selected_series_data = self.data[self.data['series_id'] == selected_series_id]
+            if selected_series_data.empty:
+                self.display_message("Выбранная серия не найдена.", message_type="error")
+                return
+
+            # Определяем индекс строки, где находится серия
+            original_index = self.data[self.data['series_id'] == selected_series_id].index[-1]
+
+            # Создаём копию серии с новым ID
+            new_series = selected_series_data.copy()
+            new_series_id = self.data['series_id'].max() + 1  # Устанавливаем новый ID для копии
+            new_series['series_id'] = new_series_id
+
+            # Вставляем копию после оригинальной серии
+            part_before = self.data.iloc[:original_index + 1]
+            part_after = self.data.iloc[original_index + 1:]
+            self.data = pd.concat([part_before, new_series, part_after], ignore_index=True)
+
+            # Обновляем отображение таблицы и списков
+            self.table.update_data(self.data)
+            self.update_series_listbox()
+
+            self.display_message(f"Серия {selected_series_id} успешно скопирована как {new_series_id}.",
+                                 message_type="success")
+        except Exception as e:
+            self.display_message(f"Ошибка при копировании серии: {e}", message_type="error")
 
     def checks(self):
         """Проверка расхождений в координатах для каждой станции среди серий и замыкания линий."""
