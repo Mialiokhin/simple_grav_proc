@@ -135,6 +135,15 @@ class SurveyDataTab:
         self.pressure_entry_station = tk.Entry(station_name_pressure_frame, width=20)
         self.pressure_entry_station.pack(side='left')
 
+        station_height_frame = tk.Frame(self.edit_station_frame)
+        station_height_frame.pack(pady=2)
+
+        self.station_height_label = tk.Label(station_height_frame, text="Instr.Height(mm):")
+        self.station_height_label.pack(side='left', padx=(0, 5))
+        self.station_height_entry = tk.Entry(station_height_frame, width=20)
+        self.station_height_entry.pack(side='left')
+
+
         # Фрейм для кнопок управления станцией
         station_buttons_frame = tk.Frame(self.edit_station_frame)
         station_buttons_frame.pack(pady=5)
@@ -195,7 +204,7 @@ class SurveyDataTab:
         self.pressure_entry = tk.Entry(series_name_pressure_frame, width=20)
         self.pressure_entry.pack(side='left')
 
-        # Субфрейм для линии (в одну строчку)
+        # Субфрейм для линии и высоты инструмента (в одну строчку)
         series_line_frame = tk.Frame(self.edit_series_frame)
         series_line_frame.pack(pady=2)
 
@@ -203,6 +212,11 @@ class SurveyDataTab:
         self.series_line_label.pack(side='left', padx=(0, 5))
         self.series_line_entry = tk.Entry(series_line_frame, width=20)
         self.series_line_entry.pack(side='left', padx=(0, 15))
+
+        self.series_height_label = tk.Label(series_line_frame, text="Instr.Height(mm):")
+        self.series_height_label.pack(side='left', padx=(0, 5))
+        self.series_height_entry = tk.Entry(series_line_frame, width=20)
+        self.series_height_entry.pack(side='left')
 
         # Фрейм для кнопок управления серией
         series_buttons_frame = tk.Frame(self.edit_series_frame)
@@ -366,8 +380,22 @@ class SurveyDataTab:
             new_lat_str = self.station_lat_entry.get().strip()
             new_lon_str = self.station_lon_entry.get().strip()
             new_pressure_str = self.pressure_entry_station.get().strip()
+            new_height_str = self.station_height_entry.get().strip()
 
             changes_made = False  # Флаг, указывающий на наличие изменений
+
+            # Проверяем и обновляем высоту инструмента
+            if new_height_str:
+                try:
+                    new_height = float(new_height_str.replace(",", "."))
+                    current_height = self.data.loc[self.data['station'] == station_name, 'instr_height'].iloc[0]
+                    if new_height != current_height:
+                        self.data.loc[self.data['station'] == station_name, 'instr_height'] = new_height
+                        changes_made = True
+                except ValueError:
+                    self.display_message("Пожалуйста, введите корректное значение для высоты инструмента.",
+                                         message_type="warning")
+                    return
 
             # Проверяем и обновляем название станции, если введено новое имя и оно отличается
             if new_name and new_name != station_name:
@@ -476,8 +504,22 @@ class SurveyDataTab:
             new_lon_str = self.series_lon_entry.get().strip()
             new_pressure_str = self.pressure_entry.get().strip()
             new_line_str = self.series_line_entry.get().strip()
+            new_height_str = self.series_height_entry.get().strip()
             changes_made = False  # Флаг, указывающий на наличие изменений
             pressure_changed = False  # Флаг, указывающий на изменение давления
+
+            # Проверяем и обновляем высоту инструмента
+            if new_height_str:
+                try:
+                    new_height = float(new_height_str.replace(",", "."))
+                    current_height = self.data.loc[self.data['series_id'] == series_id, 'instr_height'].iloc[0]
+                    if new_height != current_height:
+                        self.data.loc[self.data['series_id'] == series_id, 'instr_height'] = new_height
+                        changes_made = True
+                except ValueError:
+                    self.display_message("Пожалуйста, введите корректное значение для высоты инструмента.",
+                                         message_type="warning")
+                    return
 
             # Проверяем и обновляем название станции, если введено новое имя и оно отличается
             if new_station_name and new_station_name != \
