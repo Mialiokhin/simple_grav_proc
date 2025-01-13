@@ -143,7 +143,6 @@ class SurveyDataTab:
         self.station_height_entry = tk.Entry(station_height_frame, width=20)
         self.station_height_entry.pack(side='left')
 
-
         # Фрейм для кнопок управления станцией
         station_buttons_frame = tk.Frame(self.edit_station_frame)
         station_buttons_frame.pack(pady=5)
@@ -676,11 +675,17 @@ class SurveyDataTab:
                 self.current_station_lat = station_data.iloc[0]['lat']
                 self.current_station_lon = station_data.iloc[0]['lon']
                 self.current_station_pressure = station_data.iloc[0].get('pressure', None)
+                self.current_station_height = station_data.iloc[0]['instr_height']
+
                 # Заполняем поля ввода координат и давления
                 self.station_lat_entry.delete(0, tk.END)
                 self.station_lat_entry.insert(0, str(self.current_station_lat))
+
                 self.station_lon_entry.delete(0, tk.END)
                 self.station_lon_entry.insert(0, str(self.current_station_lon))
+
+                self.station_height_entry.delete(0, tk.END)
+                self.station_height_entry.insert(0, str(self.current_station_height))
                 # Заполняем поле для переименования текущим названием станции
                 self.rename_station_entry.delete(0, tk.END)
                 self.rename_station_entry.insert(0, station_name)
@@ -704,9 +709,12 @@ class SurveyDataTab:
                 self.current_series_lon = series_data.iloc[0]['lon']
                 self.current_series_pressure = series_data.iloc[0].get('pressure', None)
                 self.current_series_line = series_data.iloc[0].get('line', None)
+                self.current_series_height = series_data.iloc[0]['instr_height']
                 # Заполняем поля ввода координат, названия станции и давления
                 self.series_line_entry.delete(0, tk.END)
                 self.series_line_entry.insert(0, str(self.current_series_line))
+                self.series_height_entry.delete(0, tk.END)
+                self.series_height_entry.insert(0, str(self.current_series_height))
                 self.series_lat_entry.delete(0, tk.END)
                 self.series_lat_entry.insert(0, str(self.current_series_lat))
                 self.series_lon_entry.delete(0, tk.END)
