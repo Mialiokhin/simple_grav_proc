@@ -37,6 +37,18 @@ class SurveyDataTab:
         controls_frame = tk.Frame(self.frame)
         controls_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
+        # Фрейм для кнопок Save и Load
+        save_load_frame = tk.Frame(controls_frame)
+        save_load_frame.pack(pady=5)
+
+        # Кнопка Save Project
+        self.save_data_button = tk.Button(save_load_frame, text="Save Project", command=self.save_data_to_file)
+        self.save_data_button.pack(side='left', padx=5)
+
+        # Кнопка Load Project
+        self.load_data_button = tk.Button(save_load_frame, text="Load Project", command=self.load_data_from_file)
+        self.load_data_button.pack(side='left', padx=5)
+
         # Поля выбора файлов данных
         self.data_files_label = tk.Label(controls_frame, text="Survey Data:")
         self.data_files_label.pack(pady=5)
@@ -1166,3 +1178,55 @@ class SurveyDataTab:
         # Обновляем списки
         self.update_station_listbox()
         self.update_series_listbox()
+
+    def save_data_to_file(self):
+        """Сохранение всех данных из таблицы в файл CSV."""
+        if self.data is not None:
+            file_path = filedialog.asksaveasfilename(
+                title="Save Data As",
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+            )
+            if file_path:
+                try:
+                    self.data.to_csv(file_path, index=False)
+                    self.display_message(f"Данные успешно сохранены в файл: {file_path}", message_type="success")
+                except Exception as e:
+                    self.display_message(f"Ошибка при сохранении файла: {e}", message_type="error")
+        else:
+            self.display_message("Нет данных для сохранения.", message_type="warning")
+
+    def load_data_from_file(self):
+        """Загрузка данных из файла CSV."""
+        file_path = filedialog.askopenfilename(
+            title="Select Data File",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        if file_path:
+            try:
+                # Указываем, что колонка 'station' должна быть строкой
+                self.data = pd.read_csv(file_path, dtype={'station': str})
+
+                # Преобразование всех колонок, связанных с датами, в формат datetime
+                date_columns = ['date_time', 'created']  # Укажите здесь все колонки с датами
+                for col in date_columns:
+                    if col in self.data.columns:
+                        self.data[col] = pd.to_datetime(self.data[col])
+
+                # Если таблица не существует, создаем новую
+                if self.table is None:
+                    self.table = InputDataTable(self.table_frame, self.data,
+                                                data_modified_callback=self.on_data_modified)
+                else:
+                    self.table.update_data(self.data)
+
+                # Обновляем списки станций и серий
+                self.update_station_listbox()
+                self.update_series_listbox()
+                self.display_message(f"Данные успешно загружены из файла: {file_path}", message_type="success")
+            except Exception as e:
+                self.display_message(f"Ошибка при загрузке файла: {e}", message_type="error")
+
+
+
+
