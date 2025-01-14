@@ -4,6 +4,8 @@ from datetime import datetime as dt
 import numpy as np
 import networkx as nx
 import statsmodels.api as sm
+from sklearn.ensemble import IsolationForest
+from sklearn.neighbors import LocalOutlierFactor
 
 
 # Функции для замены GPS-координат на пользовательские, если GPS данные отсутствуют
@@ -653,7 +655,8 @@ def to_seconds(value):
 
 # Функция для оценки свободных привязок и дрифта
 def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degree=2, method='WLS',
-                  confidence_interval=100):
+                  confidence_interval=95, outlier_detection_method='IsolationForest'):
+
     # Создание матрицы наблюдений для станций
     observation_matrix = pd.get_dummies(stations).drop(fix_station, axis=1)
 
@@ -675,62 +678,114 @@ def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degre
 
     result = model.fit()
 
-    # Фильтрация данных по доверительному интервалу
-    residuals = result.resid
-    lower_bound = np.percentile(residuals, (100 - confidence_interval) / 2)
-    upper_bound = np.percentile(residuals, 100 - (100 - confidence_interval) / 2)
-    filtered_indices = (residuals >= lower_bound) & (residuals <= upper_bound)
+    # Проверка значения confidence_interval
+    if confidence_interval < 100:
+        contamination = (100 - confidence_interval) / 100  # Перевод доверительного интервала в долю выбросов
+        residuals = result.resid.values.reshape(-1, 1)
 
-    # Считаем оставшиеся и общее количество измерений
-    remaining_measurements = filtered_indices.sum()
-    total_measurements = len(residuals)
+        # Выбор метода детекции выбросов
+        if outlier_detection_method == 'IsolationForest':
+            outlier_model = IsolationForest(contamination=contamination, random_state=42)
+            outliers = outlier_model.fit_predict(residuals)
+        elif outlier_detection_method == 'LOF':
+            outlier_model = LocalOutlierFactor(n_neighbors=20, contamination=contamination)
+            outliers = outlier_model.fit_predict(residuals)
+        elif outlier_detection_method == 'Z-score':
+            z_scores = np.abs((residuals - np.mean(residuals)) / np.std(residuals))
+            threshold = np.percentile(z_scores, confidence_interval)
+            outliers = (z_scores <= threshold).astype(int).flatten()
+            outliers = np.where(outliers == 0, -1, 1)  # Приводим к формату -1 для выбросов
+        elif outlier_detection_method == 'IsolationForest+LOF':
+            # Сначала фильтруем данные с помощью Isolation Forest
+            isolation_forest = IsolationForest(contamination=contamination, random_state=42)
+            isolation_outliers = isolation_forest.fit_predict(residuals)
+            filtered_indices_isolation = isolation_outliers != -1
 
-    # Если данных не осталось, возвращаем предупреждение
-    if remaining_measurements == 0:
-        print("Warning: No data points remain after filtering by confidence interval. Returning original results.")
-        return result.params, residuals, f"{remaining_measurements}/{total_measurements}"
+            # Применяем LOF к данным, прошедшим Isolation Forest
+            filtered_residuals = residuals[filtered_indices_isolation]
+            lof = LocalOutlierFactor(n_neighbors=20, contamination=contamination)
+            lof_outliers = lof.fit_predict(filtered_residuals)
 
-    # Фильтрация данных
-    filtered_stations = stations[filtered_indices]
-    filtered_gravity = gravity[filtered_indices]
-    filtered_date_time = date_time[filtered_indices]
+            # Объединяем результаты: выбросы, определенные любым из методов
+            final_outliers = np.full(residuals.shape[0], 1)
+            final_outliers[~filtered_indices_isolation] = -1  # Выбросы из Isolation Forest
+            final_outliers[filtered_indices_isolation] = lof_outliers
 
-    if std is not None:
-        filtered_std = std[filtered_indices]
+            outliers = final_outliers
+        else:
+            raise ValueError("Unsupported outlier detection method")
+
+        # Отфильтровываем данные, которые не являются выбросами
+        filtered_indices = outliers != -1
+
+        # Считаем оставшиеся и общее количество измерений
+        remaining_measurements = filtered_indices.sum()
+        total_measurements = len(residuals)
+
+        # Если данных не осталось, возвращаем предупреждение
+        if remaining_measurements == 0:
+            print("Warning: No data points remain after outlier filtering. Returning original results.")
+            return result.params, result.resid
+
+        # Фильтрация данных
+        filtered_stations = stations[filtered_indices]
+        filtered_gravity = gravity[filtered_indices]
+        filtered_date_time = date_time[filtered_indices]
+
+        if std is not None:
+            filtered_std = std[filtered_indices]
+        else:
+            filtered_std = None
+
+        # Перезапуск модели с отфильтрованными данными
+        observation_matrix_filtered = pd.get_dummies(filtered_stations).drop(fix_station, axis=1)
+        time_matrix_filtered = np.vander(filtered_date_time, max_degree)
+        design_matrix_filtered = np.hstack((observation_matrix_filtered, time_matrix_filtered))
+
+        match method:
+            case 'RLM':
+                model_filtered = sm.RLM(filtered_gravity, design_matrix_filtered)
+            case 'WLS':
+                if filtered_std is not None:
+                    model_filtered = sm.WLS(filtered_gravity, design_matrix_filtered, weights=1 / filtered_std)
+                else:
+                    model_filtered = sm.WLS(filtered_gravity, design_matrix_filtered)
+
+        result_filtered = model_filtered.fit()
+
+        # Создание таблицы связей
+        ties = pd.DataFrame()
+        for index, station in enumerate(observation_matrix_filtered.columns):
+            ties = pd.concat([
+                ties,
+                pd.DataFrame({
+                    'station_from': fix_station,
+                    'station_to': station,
+                    'tie': result_filtered.params.iloc[index],
+                    'err': result_filtered.bse.iloc[index],
+                    'remaining_total': f"{remaining_measurements}/{total_measurements}"  # Добавляем Remaining/Total
+                }, index=[0])
+            ], ignore_index=True)
+
+        return ties, result_filtered.resid
     else:
-        filtered_std = None
+        # Если confidence_interval == 100, возвращаем результаты без фильтрации
 
-    # Перезапуск модели с отфильтрованными данными
-    observation_matrix_filtered = pd.get_dummies(filtered_stations).drop(fix_station, axis=1)
-    time_matrix_filtered = np.vander(filtered_date_time, max_degree)
-    design_matrix_filtered = np.hstack((observation_matrix_filtered, time_matrix_filtered))
+        # Создание таблицы связей
+        ties = pd.DataFrame()
+        for index, station in enumerate(observation_matrix.columns):
+            ties = pd.concat([
+                ties,
+                pd.DataFrame({
+                    'station_from': fix_station,
+                    'station_to': station,
+                    'tie': result.params.iloc[index],
+                    'err': result.bse.iloc[index],
+                    'remaining_total': f"{len(stations)}/{len(stations)}"  # Все данные включены
+                }, index=[0])
+            ], ignore_index=True)
 
-    match method:
-        case 'RLM':
-            model_filtered = sm.RLM(filtered_gravity, design_matrix_filtered)
-        case 'WLS':
-            if filtered_std is not None:
-                model_filtered = sm.WLS(filtered_gravity, design_matrix_filtered, weights=1 / filtered_std)
-            else:
-                model_filtered = sm.WLS(filtered_gravity, design_matrix_filtered)
-
-    result_filtered = model_filtered.fit()
-
-    # Создание таблицы связей
-    ties = pd.DataFrame()
-    for index, station in enumerate(observation_matrix_filtered.columns):
-        ties = pd.concat([
-            ties,
-            pd.DataFrame({
-                'station_from': fix_station,
-                'station_to': station,
-                'tie': result_filtered.params.iloc[index],
-                'err': result_filtered.bse.iloc[index],
-                'remaining_total': f"{remaining_measurements}/{total_measurements}"  # Добавляем Remaining/Total
-            }, index=[0])
-        ], ignore_index=True)
-
-    return ties, result_filtered.resid
+        return ties, result.resid
 
 
 # Функция для подбора дрифта по станциям
@@ -865,7 +920,7 @@ def get_meter_ties_all(readings):
 
 
 # Основная функция расчета приращений для конкретного прибора и его измерений
-def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False, confidence_interval=100):
+def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False, confidence_interval=100, outlier_method='IsolationForest'):
     ties = pd.DataFrame()
     fix_station = anchor
 
@@ -895,7 +950,8 @@ def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False, confide
             std=grouped.std_err,
             max_degree=2,
             method=method,
-            confidence_interval=confidence_interval  # Передаем параметр confidence_interval
+            confidence_interval=confidence_interval,  # Передаем параметр confidence_interval
+            outlier_detection_method=outlier_method
         )
         fitgrav['instrument_serial_number'] = meter
         fitgrav['survey_name'] = survey

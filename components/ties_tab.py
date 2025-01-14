@@ -55,10 +55,19 @@ class TiesTab:
         ci_label = tk.Label(controls_frame, text="Residual Confidence Interval (%):")
         ci_label.grid(row=5, column=0, padx=5, pady=5, sticky="w")
 
-        self.ci_var = tk.IntVar(value=100)  # Значение по умолчанию
+        self.ci_var = tk.IntVar(value=95)  # Значение по умолчанию
         self.ci_combo = ttk.Combobox(controls_frame, textvariable=self.ci_var, state="readonly")
         self.ci_combo['values'] = list(range(1, 101))  # От 1 до 100
         self.ci_combo.grid(row=6, column=0, padx=5, pady=5, sticky="w")
+
+        # Выпадающий список для выбора метода детекции выбросов
+        outlier_method_label = tk.Label(controls_frame, text="Outlier Detection Method:")
+        outlier_method_label.grid(row=5, column=1, padx=5, pady=5, sticky="w")
+
+        self.outlier_method_var = tk.StringVar(value='IsolationForest')
+        self.outlier_method_combo = ttk.Combobox(controls_frame, textvariable=self.outlier_method_var, state="readonly")
+        self.outlier_method_combo['values'] = ('IsolationForest', 'LOF', 'Z-score', 'IsolationForest+LOF')
+        self.outlier_method_combo.grid(row=6, column=1, padx=5, pady=5, sticky="w")
 
         # Кнопка запуска расчета (Ties)
         self.ties_button = tk.Button(controls_frame, text="Solve ties", command=self.calculate_ties)
@@ -132,6 +141,7 @@ class TiesTab:
             method = self.method_var.get()
             by_lines = self.by_lines_var.get()
             confidence_interval = self.ci_var.get()  # Получение выбранного значения Confidence Interval
+            outlier_method = self.outlier_method_var.get()  # Получение выбранного метода детекции выбросов
 
             # Получение данных из вкладки Survey Data
             data = self.survey_data_tab.get_dataframe()
@@ -148,8 +158,7 @@ class TiesTab:
                 return
 
             # Расчет привязок
-            ties = fit_by_meter_created(data, anchor=None, method=method, by_lines=by_lines,
-                                        confidence_interval=confidence_interval)
+            ties = fit_by_meter_created(data, anchor=None, method=method, by_lines=by_lines, confidence_interval=confidence_interval, outlier_method=outlier_method)
             report = get_report(ties)
 
             # Сохраняем отчет
