@@ -165,17 +165,18 @@ class TiesTab:
             # Открытие файла логов для записи
             log_file_path = os.path.join(result_dir, f"{survey_name}_ties_log.txt")
             with open(log_file_path, 'w', encoding='utf-8') as log_file:
-                # Запись начальных параметров
-                log_file.write(f"Calculation method: {method}\n")
-                log_file.write(f"Calculate by lines: {by_lines}\n")
-                log_file.write(f"Confidence Interval: {confidence_interval}%\n")
-                log_file.write(f"Outlier Detection Method: {outlier_method}\n")
-                log_file.write("=" * 50 + "\n")
 
                 # Логи из SurveyDataTab
                 log_file.write("=== Logs from SurveyDataTab ===\n")
                 survey_logs = self.survey_data_tab.message_text.get(1.0, tk.END)
                 log_file.write(survey_logs + "\n")
+                log_file.write("=" * 50 + "\n")
+
+                # Запись начальных параметров
+                log_file.write(f"Calculation method: {method}\n")
+                log_file.write(f"Calculate by lines: {by_lines}\n")
+                log_file.write(f"Confidence Interval: {confidence_interval}%\n")
+                log_file.write(f"Outlier Detection Method: {outlier_method}\n")
                 log_file.write("=" * 50 + "\n")
 
                 # Расчет привязок
@@ -247,4 +248,3 @@ class TiesTab:
                                 f"The calculation of the ties is completed!\nLogs saved")
         except Exception as e:
             messagebox.showerror("Error", f"Error in calculating ties: {e}")
-

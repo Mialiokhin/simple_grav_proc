@@ -1,4 +1,5 @@
 import tkinter as tk
+import datetime
 from tkinter import filedialog
 from components.input_data_table import InputDataTable
 from grav_proc.loader import read_data
@@ -269,7 +270,7 @@ class SurveyDataTab:
         self.frame.grid_columnconfigure(0, weight=1)
 
     def display_message(self, message, message_type="info"):
-        """Добавление нового сообщения в message_text с соответствующим цветом фона."""
+        """Добавление нового сообщения в message_text с соответствующим цветом фона и меткой времени."""
         colors = {
             "error": "#ffcccc",  # pale red
             "warning": "#ffebcc",  # pale orange
@@ -278,9 +279,13 @@ class SurveyDataTab:
         }
         bg_color = colors.get(message_type, "#ccffcc")  # default to pale green
 
+        # Добавляем временную метку к сообщению
+        timestamp = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+        full_message = f"{timestamp} {message}"
+
         # Добавляем сообщение с новой строки
         self.message_text.configure(state='normal', bg=bg_color)
-        self.message_text.insert(tk.END, f"{message}\n")
+        self.message_text.insert(tk.END, f"{full_message}\n")
         self.message_text.see(tk.END)  # Автоматический скролл к последнему сообщению
         self.message_text.configure(state='disabled')
 
@@ -1211,8 +1216,6 @@ class SurveyDataTab:
         else:
             self.display_message("Нет данных для сохранения.", message_type="warning")
 
-
-
     def load_data_from_file(self):
         """Загрузка данных и логов из файла."""
         file_path = filedialog.askopenfilename(
@@ -1252,13 +1255,3 @@ class SurveyDataTab:
                 self.display_message(f"Проект успешно загружен: {file_path}", message_type="success")
             except Exception as e:
                 self.display_message(f"Ошибка при загрузке файла: {e}", message_type="error")
-
-
-
-
-
-
-
-
-
-
