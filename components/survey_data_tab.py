@@ -447,7 +447,7 @@ class SurveyDataTab:
                 try:
                     new_pressure = float(new_pressure_str.replace(",", "."))
                     current_pressure = \
-                    self.data.loc[self.data['station'] == (new_name or station_name), 'pressure'].iloc[0]
+                        self.data.loc[self.data['station'] == (new_name or station_name), 'pressure'].iloc[0]
                     if pd.isnull(current_pressure) or new_pressure != current_pressure:
                         self.data.loc[self.data['station'] == (new_name or station_name), 'pressure'] = new_pressure
                         changes.append(f"Pressure: {current_pressure} → {new_pressure}")
@@ -471,6 +471,13 @@ class SurveyDataTab:
                 # Выводим сообщение об изменениях
                 changes_str = "; ".join(changes)
                 self.display_message(f"Станция '{station_name}' обновлена: {changes_str}", message_type="success")
+
+                # Переключение на следующую станцию
+                next_index = selected_index[0] + 1
+                if next_index < self.station_listbox.size():
+                    self.station_listbox.selection_clear(0, tk.END)
+                    self.station_listbox.selection_set(next_index)
+                    self.station_listbox.event_generate('<<ListboxSelect>>')
             else:
                 self.display_message("Нет изменений для сохранения.", message_type="success")
         else:
@@ -639,6 +646,14 @@ class SurveyDataTab:
                 self.display_message(
                     f"Серия {series_id} (Станция: {new_station_name if new_station_name else self.data.loc[self.data['series_id'] == series_id, 'station'].iloc[0]}) обновлена: {changes_str}",
                     message_type="success")
+
+                # Найти индекс следующей серии
+                next_index = selected_index[0] + 1
+                if next_index < self.series_listbox.size():
+                    self.series_listbox.selection_clear(0, tk.END)  # Очистить текущее выделение
+                    self.series_listbox.selection_set(next_index)  # Выбрать следующую серию
+                    self.series_listbox.event_generate('<<ListboxSelect>>')  # Сгенерировать событие выбора
+
             else:
                 self.display_message("Нет изменений для сохранения.", message_type="success")
         else:
