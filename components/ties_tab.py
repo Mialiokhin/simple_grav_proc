@@ -149,16 +149,22 @@ class TiesTab:
             # Применение коэффициентов, если загружены
             data = self.apply_scale_factors(data)
 
-            # Запрашиваем название съемки
-            survey_name = os.path.basename(self.survey_data_tab.data_files_entry.get().split(',')[0]).split('.')[0]
-
+            # Получить survey_name из пути к данным или файлу проекта
+            survey_name = self.survey_data_tab.data_files_entry.get()
+            if not survey_name:
+                # Если файл данных отсутствует, попробуем получить survey_name из первого ряда данных
+                survey_name = self.survey_data_tab.data['survey_name'].iloc[
+                    0] if 'survey_name' in self.survey_data_tab.data.columns else "unknown_survey"
+            else:
+                survey_name = os.path.basename(survey_name.split(',')[0]).split('.')[0]
             # Выбираем папку для сохранения
             result_dir = self.choose_output_directory(survey_name, "ties")
             if not result_dir:
                 return
 
             # Расчет привязок
-            ties = fit_by_meter_created(data, anchor=None, method=method, by_lines=by_lines, confidence_interval=confidence_interval, outlier_method=outlier_method)
+            ties = fit_by_meter_created(data, anchor=None, method=method, by_lines=by_lines,
+                                        confidence_interval=confidence_interval, outlier_method=outlier_method)
             report = get_report(ties)
 
             # Сохраняем отчет

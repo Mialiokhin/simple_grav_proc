@@ -1180,11 +1180,17 @@ class SurveyDataTab:
         self.update_series_listbox()
 
     def save_data_to_file(self, file_path=None):
-        """Сохранение всех данных из таблицы в файл CSV."""
+        """Сохранение всех данных из таблицы в файл CSV с предложением имени файла."""
         if self.data is not None:
+            # Попытка получить survey_name
+            survey_name = self.data['survey_name'].iloc[0] if 'survey_name' in self.data.columns else "unknown_survey"
+            default_filename = f"{survey_name}_project.csv"  # Шаблон имени файла
+
             if not file_path:
+                # Открытие диалогового окна с предложением имени файла
                 file_path = filedialog.asksaveasfilename(
                     title="Save Data As",
+                    initialfile=default_filename,  # Предложенное имя файла
                     defaultextension=".csv",
                     filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
                 )
