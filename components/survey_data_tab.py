@@ -389,7 +389,7 @@ class SurveyDataTab:
                 self.series_listbox.insert(tk.END, series_text)
 
     def save_station_changes(self):
-        """Сохранение изменений станции: переименование, координаты и давление"""
+        """Сохранение изменений станции: переименование, координаты и давление."""
         selected_index = self.station_listbox.curselection()
         if selected_index:
             station_name = self.station_listbox.get(selected_index)
@@ -399,80 +399,66 @@ class SurveyDataTab:
             new_pressure_str = self.pressure_entry_station.get().strip()
             new_height_str = self.station_height_entry.get().strip()
 
-            changes_made = False  # Флаг, указывающий на наличие изменений
+            changes = []  # Список для хранения изменений
 
-            # Проверяем и обновляем высоту инструмента
+            # Высота инструмента
             if new_height_str:
                 try:
                     new_height = float(new_height_str.replace(",", "."))
                     current_height = self.data.loc[self.data['station'] == station_name, 'instr_height'].iloc[0]
                     if new_height != current_height:
                         self.data.loc[self.data['station'] == station_name, 'instr_height'] = new_height
-                        changes_made = True
+                        changes.append(f"Instr.Height: {current_height} → {new_height}")
                 except ValueError:
-                    self.display_message("Пожалуйста, введите корректное значение для высоты инструмента.",
-                                         message_type="warning")
+                    self.display_message("Введите корректное значение для высоты инструмента.", message_type="warning")
                     return
 
-            # Проверяем и обновляем название станции, если введено новое имя и оно отличается
+            # Имя станции
             if new_name and new_name != station_name:
                 self.data.loc[self.data['station'] == station_name, 'station'] = new_name
-                changes_made = True
+                changes.append(f"Station Name: {station_name} → {new_name}")
 
-            # Проверяем и обновляем широту, если введено новое значение и оно отличается
+            # Широта
             if new_lat_str:
                 try:
                     new_lat = float(new_lat_str.replace(",", "."))
-                    current_lat = self.data.loc[
-                        self.data['station'] == (new_name if new_name else station_name), 'lat'
-                    ].iloc[0]
+                    current_lat = self.data.loc[self.data['station'] == (new_name or station_name), 'lat'].iloc[0]
                     if new_lat != current_lat:
-                        self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lat'] = new_lat
-                        changes_made = True
+                        self.data.loc[self.data['station'] == (new_name or station_name), 'lat'] = new_lat
+                        changes.append(f"Lat: {current_lat} → {new_lat}")
                 except ValueError:
-                    self.display_message("Пожалуйста, введите корректное числовое значение для широты.",
-                                         message_type="warning")
+                    self.display_message("Введите корректное значение для широты.", message_type="warning")
                     return
 
-            # Проверяем и обновляем долготу, если введено новое значение и оно отличается
+            # Долгота
             if new_lon_str:
                 try:
                     new_lon = float(new_lon_str.replace(",", "."))
-                    current_lon = self.data.loc[
-                        self.data['station'] == (new_name if new_name else station_name), 'lon'
-                    ].iloc[0]
+                    current_lon = self.data.loc[self.data['station'] == (new_name or station_name), 'lon'].iloc[0]
                     if new_lon != current_lon:
-                        self.data.loc[self.data['station'] == (new_name if new_name else station_name), 'lon'] = new_lon
-                        changes_made = True
+                        self.data.loc[self.data['station'] == (new_name or station_name), 'lon'] = new_lon
+                        changes.append(f"Lon: {current_lon} → {new_lon}")
                 except ValueError:
-                    self.display_message("Пожалуйста, введите корректное числовое значение для долготы.",
-                                         message_type="warning")
+                    self.display_message("Введите корректное значение для долготы.", message_type="warning")
                     return
 
-            # Проверяем и обновляем атмосферное давление, если введено новое значение и оно отличается
+            # Давление
             if new_pressure_str:
                 try:
                     new_pressure = float(new_pressure_str.replace(",", "."))
-                    current_pressure = self.data.loc[
-                        self.data['station'] == (new_name if new_name else station_name), 'pressure'
-                    ].iloc[0]
+                    current_pressure = \
+                    self.data.loc[self.data['station'] == (new_name or station_name), 'pressure'].iloc[0]
                     if pd.isnull(current_pressure) or new_pressure != current_pressure:
-                        self.data.loc[
-                            self.data['station'] == (new_name if new_name else station_name), 'pressure'] = new_pressure
-                        changes_made = True
+                        self.data.loc[self.data['station'] == (new_name or station_name), 'pressure'] = new_pressure
+                        changes.append(f"Pressure: {current_pressure} → {new_pressure}")
                 except ValueError:
-                    self.display_message("Пожалуйста, введите корректное числовое значение для давления.",
-                                         message_type="warning")
+                    self.display_message("Введите корректное значение для давления.", message_type="warning")
                     return
 
-            if changes_made:
-                # Обновляем series_id
+            if changes:
+                # Обновляем series_id, таблицу и списки
                 self.update_series_id()
-
-                # Обновляем отображение таблицы
                 self.table.update_data(self.data)
-
-                # Обновляем списки
                 self.update_station_listbox()
                 self.update_series_listbox()
 
@@ -482,7 +468,9 @@ class SurveyDataTab:
                 self.station_lon_entry.delete(0, tk.END)
                 self.pressure_entry_station.delete(0, tk.END)
 
-                self.display_message(f"Станция '{station_name}' успешно обновлена.", message_type="success")
+                # Выводим сообщение об изменениях
+                changes_str = "; ".join(changes)
+                self.display_message(f"Станция '{station_name}' обновлена: {changes_str}", message_type="success")
             else:
                 self.display_message("Нет изменений для сохранения.", message_type="success")
         else:
@@ -512,7 +500,7 @@ class SurveyDataTab:
             self.display_message("Пожалуйста, выберите станцию для удаления.", message_type="warning")
 
     def save_series_changes(self):
-        """Сохранение изменений серии: переименование станции, координат и давления"""
+        """Сохранение изменений серии: переименование станции, координат и давления."""
         selected_index = self.series_listbox.curselection()
         if selected_index:
             series_id = self.data['series_id'].unique()[selected_index[0]]
@@ -522,85 +510,79 @@ class SurveyDataTab:
             new_pressure_str = self.pressure_entry.get().strip()
             new_line_str = self.series_line_entry.get().strip()
             new_height_str = self.series_height_entry.get().strip()
-            changes_made = False  # Флаг, указывающий на наличие изменений
+
+            changes = []  # Список для хранения изменений
             pressure_changed = False  # Флаг, указывающий на изменение давления
 
-            # Проверяем и обновляем высоту инструмента
+            # Высота инструмента
             if new_height_str:
                 try:
                     new_height = float(new_height_str.replace(",", "."))
                     current_height = self.data.loc[self.data['series_id'] == series_id, 'instr_height'].iloc[0]
                     if new_height != current_height:
                         self.data.loc[self.data['series_id'] == series_id, 'instr_height'] = new_height
-                        changes_made = True
+                        changes.append(f"Instr.Height: {current_height} → {new_height}")
                 except ValueError:
-                    self.display_message("Пожалуйста, введите корректное значение для высоты инструмента.",
-                                         message_type="warning")
+                    self.display_message("Введите корректное значение для высоты инструмента.", message_type="warning")
                     return
 
-            # Проверяем и обновляем название станции, если введено новое имя и оно отличается
+            # Имя станции
             if new_station_name and new_station_name != \
                     self.data.loc[self.data['series_id'] == series_id, 'station'].iloc[0]:
+                current_station_name = self.data.loc[self.data['series_id'] == series_id, 'station'].iloc[0]
                 self.data.loc[self.data['series_id'] == series_id, 'station'] = new_station_name
-                changes_made = True
+                changes.append(f"Station Name: {current_station_name} → {new_station_name}")
 
-            # Проверяем и обновляем линию, если введена новая линия и она отличается
+            # Линия
             if new_line_str:
                 try:
                     new_line = int(new_line_str)
                     current_line = self.data.loc[self.data['series_id'] == series_id, 'line'].iloc[0]
                     if new_line != current_line:
                         self.data.loc[self.data['series_id'] == series_id, 'line'] = new_line
-                        changes_made = True
+                        changes.append(f"Line: {current_line} → {new_line}")
                 except ValueError:
-                    self.display_message("Пожалуйста, введите корректное числовое значение для линии.",
-                                         message_type="warning")
+                    self.display_message("Введите корректное числовое значение для линии.", message_type="warning")
                     return
 
-            # Проверяем и обновляем широту, если введено новое значение и оно отличается
+            # Широта
             if new_lat_str:
                 try:
                     new_lat = float(new_lat_str.replace(",", "."))
                     current_lat = self.data.loc[self.data['series_id'] == series_id, 'lat'].iloc[0]
                     if new_lat != current_lat:
                         self.data.loc[self.data['series_id'] == series_id, 'lat'] = new_lat
-                        changes_made = True
+                        changes.append(f"Lat: {current_lat} → {new_lat}")
                 except ValueError:
-                    self.display_message("Пожалуйста, введите корректное числовое значение для широты.",
-                                         message_type="warning")
+                    self.display_message("Введите корректное числовое значение для широты.", message_type="warning")
                     return
 
-            # Проверяем и обновляем долготу, если введено новое значение и оно отличается
+            # Долгота
             if new_lon_str:
                 try:
                     new_lon = float(new_lon_str.replace(",", "."))
                     current_lon = self.data.loc[self.data['series_id'] == series_id, 'lon'].iloc[0]
                     if new_lon != current_lon:
                         self.data.loc[self.data['series_id'] == series_id, 'lon'] = new_lon
-                        changes_made = True
+                        changes.append(f"Lon: {current_lon} → {new_lon}")
                 except ValueError:
-                    self.display_message("Пожалуйста, введите корректное числовое значение для долготы.",
-                                         message_type="warning")
+                    self.display_message("Введите корректное числовое значение для долготы.", message_type="warning")
                     return
 
-            # Проверяем и обновляем атмосферное давление, если введено новое значение и оно отличается
+            # Давление
             if new_pressure_str:
                 try:
                     new_pressure = float(new_pressure_str.replace(",", "."))
                     current_pressure = self.data.loc[self.data['series_id'] == series_id, 'pressure'].iloc[0]
                     if pd.isnull(current_pressure) or new_pressure != current_pressure:
                         self.data.loc[self.data['series_id'] == series_id, 'pressure'] = new_pressure
-                        changes_made = True
-                        pressure_changed = True  # Устанавливаем флаг изменения давления
-                    else:
-                        # Давление не изменилось
-                        pass
+                        changes.append(f"Pressure: {current_pressure} → {new_pressure}")
+                        pressure_changed = True
                 except ValueError:
-                    self.display_message("Пожалуйста, введите корректное числовое значение для давления.",
-                                         message_type="warning")
+                    self.display_message("Введите корректное числовое значение для давления.", message_type="warning")
                     return
 
-            if changes_made:
+            if changes:
                 # Обновляем series_id
                 self.update_series_id()
 
@@ -652,7 +634,11 @@ class SurveyDataTab:
                 self.series_lon_entry.delete(0, tk.END)
                 self.pressure_entry.delete(0, tk.END)
 
-                self.display_message(f"Серия {series_id} успешно обновлена.", message_type="success")
+                # Выводим сообщение об изменениях
+                changes_str = "; ".join(changes)
+                self.display_message(
+                    f"Серия {series_id} (Станция: {new_station_name if new_station_name else self.data.loc[self.data['series_id'] == series_id, 'station'].iloc[0]}) обновлена: {changes_str}",
+                    message_type="success")
             else:
                 self.display_message("Нет изменений для сохранения.", message_type="success")
         else:
