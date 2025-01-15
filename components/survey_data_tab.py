@@ -301,6 +301,7 @@ class SurveyDataTab:
 
     def load_data_files(self):
         """Загрузка файлов данных и отображение в таблице"""
+
         files = filedialog.askopenfilenames(
             title="Select the data files",
             filetypes=[("CG-6 Data Files", "*.dat"), ("All files", "*.*")]
@@ -318,6 +319,10 @@ class SurveyDataTab:
                 raw_data = read_data(data_files)
 
             self.data = make_frame_to_proc(raw_data).copy()
+            # Очищаем поле сообщений
+            self.message_text.configure(state='normal')
+            self.message_text.delete(1.0, tk.END)
+            self.message_text.configure(state='disabled')
         except Exception as e:
             self.display_message(f"Не удалось загрузить данные: {e}", message_type="error")
             return
@@ -1244,6 +1249,10 @@ class SurveyDataTab:
 
                 self.update_station_listbox()
                 self.update_series_listbox()
+                # Очищаем поле сообщений
+                self.message_text.configure(state='normal')
+                self.message_text.delete(1.0, tk.END)
+                self.message_text.configure(state='disabled')
 
                 # Загрузка логов
                 log_file_path = file_path.replace('.csv', '_log.txt')
