@@ -164,7 +164,7 @@ class VGTab:
         return result_dir
 
     def calculate_vg(self):
-        """Расчет вертикального градиента"""
+        """Расчет вертикального градиента с сохранением логов и проекта."""
         try:
             # Получение данных из вкладки Survey Data
             data = self.survey_data_tab.get_dataframe()
@@ -172,63 +172,82 @@ class VGTab:
             # Применение коэффициентов, если загружены
             data = self.apply_scale_factors(data)
 
-            # Запрашиваем название съемки
-            survey_name = os.path.basename(self.survey_data_tab.data_files_entry.get().split(',')[0]).split('.')[0]
+            # Получить survey_name из пути к данным или файла проекта
+            survey_name = self.survey_data_tab.data_files_entry.get()
+            if not survey_name:
+                survey_name = self.survey_data_tab.data['survey_name'].iloc[0] \
+                    if 'survey_name' in self.survey_data_tab.data.columns else "unknown_survey"
+            else:
+                survey_name = os.path.basename(survey_name.split(',')[0]).split('.')[0]
 
             # Выбираем папку для сохранения
             result_dir = self.choose_output_directory(survey_name, "gradient")
             if not result_dir:
                 return
 
-            # Расчет вертикального градиента
-            vg_ties, vg_coef = get_vg(data)
+            # Открытие файла логов для записи
+            log_file_path = os.path.join(result_dir, f"{survey_name}_vg_log.txt")
+            with open(log_file_path, 'w', encoding='utf-8') as log_file:
 
-            # Генерация отчетов и сохранение их в файлы
-            ties_report_path = os.path.join(result_dir, f"{survey_name}_vg_ties.csv")
-            coeffs_report_path = os.path.join(result_dir, f"{survey_name}_vg_coeffs.csv")
-            make_vg_ties_report(vg_ties, ties_report_path, verbose=True)
-            make_vg_coeffs_report(vg_coef, coeffs_report_path, verbose=True)
+                # Логи из SurveyDataTab
+                log_file.write("=== Logs from SurveyDataTab ===\n")
+                survey_logs = self.survey_data_tab.message_text.get(1.0, tk.END)
+                log_file.write(survey_logs + "\n")
+                log_file.write("=" * 50 + "\n")
 
-            # Фильтруем только нужные колонки для VG Ties отчета
-            vg_ties_filtered = vg_ties[
-                ['created_date', 'survey', 'operator', 'meter', 'line', 'from_point', 'to_point', 'from_height',
-                 'to_height', 'gravity',
-                 'std_gravity']]
-            ties_report_md = vg_ties_filtered.to_markdown(index=False, tablefmt='grid', floatfmt='.3f')
+                # Начало расчета
+                log_file.write("Starting vertical gradient calculation...\n")
 
-            # Фильтруем только нужные колонки для VG Coefficients отчета
-            vg_coef_filtered = vg_coef[['survey', 'a', 'b', 'ua', 'ub', 'covab']]
-            coeffs_report_md = vg_coef_filtered.to_markdown(index=False, tablefmt='grid', floatfmt='.3f')
+                # Расчет вертикального градиента
+                vg_ties, vg_coef = get_vg(data)
 
-            # Очистка текстового поля и вывод отчетов
-            self.report_text_vg_ties.delete(1.0, tk.END)
-            self.report_text_vg_ties.insert(tk.END, "Vertical Gradient Ties Report:\n")
-            self.report_text_vg_ties.insert(tk.END, ties_report_md)
+                # Генерация отчетов и сохранение их в файлы
+                ties_report_path = os.path.join(result_dir, f"{survey_name}_vg_ties.csv")
+                coeffs_report_path = os.path.join(result_dir, f"{survey_name}_vg_coeffs.csv")
+                make_vg_ties_report(vg_ties, ties_report_path, verbose=True)
+                make_vg_coeffs_report(vg_coef, coeffs_report_path, verbose=True)
+                log_file.write(f"Reports saved\n")
 
-            self.report_text_vg_coeffs.delete(1.0, tk.END)
-            self.report_text_vg_coeffs.insert(tk.END, "Vertical Gradient Coefficients Report:\n")
-            self.report_text_vg_coeffs.insert(tk.END, coeffs_report_md)
+                # Фильтрация и отображение отчетов
+                vg_ties_filtered = vg_ties[
+                    ['created_date', 'survey', 'operator', 'meter', 'line', 'from_point', 'to_point',
+                     'from_height', 'to_height', 'gravity', 'std_gravity']]
+                ties_report_md = vg_ties_filtered.to_markdown(index=False, tablefmt='grid', floatfmt='.3f')
 
-            # Удаляем все вкладки с графиками перед их обновлением
-            for tab in self.graphs_notebook.tabs():
-                self.graphs_notebook.forget(tab)
+                vg_coef_filtered = vg_coef[['survey', 'a', 'b', 'ua', 'ub', 'covab']]
+                coeffs_report_md = vg_coef_filtered.to_markdown(index=False, tablefmt='grid', floatfmt='.3f')
 
-            # Сохранение и отображение графиков
-            figs = vg_plot(vg_coef, vg_ties)
-            for fig, filename in figs:
-                # Настройка графика для предотвращения обрезки
-                fig.subplots_adjust(left=0.2, right=0.8, top=0.9, bottom=0.15)  # Настройка боковых и вертикальных отступов отдельно
+                self.report_text_vg_ties.delete(1.0, tk.END)
+                self.report_text_vg_ties.insert(tk.END, "Vertical Gradient Ties Report:\n")
+                self.report_text_vg_ties.insert(tk.END, ties_report_md)
 
-                # Сохранение оригинальной фигуры
-                fig.savefig(os.path.join(result_dir, f"{survey_name}_{filename}.png"))
+                self.report_text_vg_coeffs.delete(1.0, tk.END)
+                self.report_text_vg_coeffs.insert(tk.END, "Vertical Gradient Coefficients Report:\n")
+                self.report_text_vg_coeffs.insert(tk.END, coeffs_report_md)
 
-                # Создаем новый Canvas для каждого графика и добавляем его во вкладки Notebook
-                canvas_frame = tk.Frame(self.graphs_notebook)
-                canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
-                canvas.draw()
-                canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-                self.graphs_notebook.add(canvas_frame, text=filename)
+                # Удаление старых графиков и сохранение новых
+                for tab in self.graphs_notebook.tabs():
+                    self.graphs_notebook.forget(tab)
 
-            messagebox.showinfo("Successfully", f"Vertical gradient calculation completed!")
+                figs = vg_plot(vg_coef, vg_ties)
+                for fig, filename in figs:
+                    fig.subplots_adjust(left=0.2, right=0.8, top=0.9, bottom=0.15)
+                    fig.savefig(os.path.join(result_dir, f"{survey_name}_{filename}.png"))
+                    log_file.write(f"Plot saved\n")
+
+                    canvas_frame = tk.Frame(self.graphs_notebook)
+                    canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
+                    canvas.draw()
+                    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+                    self.graphs_notebook.add(canvas_frame, text=filename)
+
+                    # Сохранение проекта
+                    project_save_path = os.path.join(result_dir, f"{survey_name}_project.csv")
+                    self.survey_data_tab.save_data_to_file(project_save_path, save_logs=False)
+                    log_file.write(f"Project saved\n")
+
+                log_file.write("Vertical gradient calculation completed successfully.\n")
+                messagebox.showinfo("Successfully", "Vertical gradient calculation completed!")
         except Exception as e:
             messagebox.showerror("Error", f"Error in calculating vertical gradient: {e}")
+

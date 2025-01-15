@@ -1186,7 +1186,7 @@ class SurveyDataTab:
         self.update_station_listbox()
         self.update_series_listbox()
 
-    def save_data_to_file(self, file_path=None):
+    def save_data_to_file(self, file_path=None, save_logs=True):
         """Сохранение данных и логов в проект."""
         if self.data is not None:
             survey_name = self.data['survey_name'].iloc[0] if 'survey_name' in self.data.columns else "unknown_survey"
@@ -1205,13 +1205,17 @@ class SurveyDataTab:
                     # Сохранение данных
                     self.data.to_csv(file_path, index=False)
 
-                    # Сохранение логов в текстовый файл
-                    log_file_path = file_path.replace('.csv', '_log.txt')
-                    with open(log_file_path, 'w', encoding='utf-8') as log_file:
-                        log_file.write(self.message_text.get(1.0, tk.END))
+                    # Сохранение логов в текстовый файл, если это необходимо
+                    if save_logs:
+                        log_file_path = file_path.replace('.csv', '_log.txt')
+                        with open(log_file_path, 'w', encoding='utf-8') as log_file:
+                            log_file.write(self.message_text.get(1.0, tk.END))
+                        self.display_message(
+                            f"Проект и лог сохранены",
+                            message_type="success")
+                    else:
+                        self.display_message(f"Проект сохранен", message_type="success")
 
-                    self.display_message(f"Данные и лог сохранены: {file_path} и {log_file_path}",
-                                         message_type="success")
                 except Exception as e:
                     self.display_message(f"Ошибка при сохранении: {e}", message_type="error")
         else:
