@@ -269,7 +269,7 @@ class SurveyDataTab:
         self.frame.grid_columnconfigure(0, weight=1)
 
     def display_message(self, message, message_type="info"):
-        """Отображение сообщения в message_text с соответствующим цветом фона."""
+        """Добавление нового сообщения в message_text с соответствующим цветом фона."""
         colors = {
             "error": "#ffcccc",  # pale red
             "warning": "#ffebcc",  # pale orange
@@ -278,9 +278,10 @@ class SurveyDataTab:
         }
         bg_color = colors.get(message_type, "#ccffcc")  # default to pale green
 
+        # Добавляем сообщение с новой строки
         self.message_text.configure(state='normal', bg=bg_color)
-        self.message_text.delete(1.0, tk.END)
-        self.message_text.insert(tk.END, message)
+        self.message_text.insert(tk.END, f"{message}\n")
+        self.message_text.see(tk.END)  # Автоматический скролл к последнему сообщению
         self.message_text.configure(state='disabled')
 
     def update_mode(self):
@@ -1180,59 +1181,83 @@ class SurveyDataTab:
         self.update_series_listbox()
 
     def save_data_to_file(self, file_path=None):
-        """Сохранение всех данных из таблицы в файл CSV с предложением имени файла."""
+        """Сохранение данных и логов в проект."""
         if self.data is not None:
-            # Попытка получить survey_name
             survey_name = self.data['survey_name'].iloc[0] if 'survey_name' in self.data.columns else "unknown_survey"
-            default_filename = f"{survey_name}_project.csv"  # Шаблон имени файла
+            default_filename = f"{survey_name}_project.csv"
 
             if not file_path:
-                # Открытие диалогового окна с предложением имени файла
                 file_path = filedialog.asksaveasfilename(
                     title="Save Data As",
-                    initialfile=default_filename,  # Предложенное имя файла
+                    initialfile=default_filename,
                     defaultextension=".csv",
                     filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
                 )
+
             if file_path:
                 try:
+                    # Сохранение данных
                     self.data.to_csv(file_path, index=False)
-                    self.display_message(f"Данные успешно сохранены в файл: {file_path}", message_type="success")
+
+                    # Сохранение логов в текстовый файл
+                    log_file_path = file_path.replace('.csv', '_log.txt')
+                    with open(log_file_path, 'w', encoding='utf-8') as log_file:
+                        log_file.write(self.message_text.get(1.0, tk.END))
+
+                    self.display_message(f"Данные и лог сохранены: {file_path} и {log_file_path}",
+                                         message_type="success")
                 except Exception as e:
-                    self.display_message(f"Ошибка при сохранении файла: {e}", message_type="error")
+                    self.display_message(f"Ошибка при сохранении: {e}", message_type="error")
         else:
             self.display_message("Нет данных для сохранения.", message_type="warning")
 
+
+
     def load_data_from_file(self):
-        """Загрузка данных из файла CSV."""
+        """Загрузка данных и логов из файла."""
         file_path = filedialog.askopenfilename(
             title="Select Data File",
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
         )
         if file_path:
             try:
-                # Указываем, что колонка 'station' должна быть строкой
                 self.data = pd.read_csv(file_path, dtype={'station': str})
 
-                # Преобразование всех колонок, связанных с датами, в формат datetime
-                date_columns = ['date_time', 'created']  # Укажите здесь все колонки с датами
+                date_columns = ['date_time', 'created']
                 for col in date_columns:
                     if col in self.data.columns:
                         self.data[col] = pd.to_datetime(self.data[col])
 
-                # Если таблица не существует, создаем новую
                 if self.table is None:
                     self.table = InputDataTable(self.table_frame, self.data,
                                                 data_modified_callback=self.on_data_modified)
                 else:
                     self.table.update_data(self.data)
 
-                # Обновляем списки станций и серий
                 self.update_station_listbox()
                 self.update_series_listbox()
-                self.display_message(f"Данные успешно загружены из файла: {file_path}", message_type="success")
+
+                # Загрузка логов
+                log_file_path = file_path.replace('.csv', '_log.txt')
+                try:
+                    with open(log_file_path, 'r', encoding='utf-8') as log_file:
+                        logs = log_file.read()
+                        self.message_text.configure(state='normal')
+                        self.message_text.delete(1.0, tk.END)
+                        self.message_text.insert(tk.END, logs)
+                        self.message_text.configure(state='disabled')
+                except FileNotFoundError:
+                    self.display_message("Лог-файл не найден. Загружается только проект.", message_type="warning")
+
+                self.display_message(f"Проект успешно загружен: {file_path}", message_type="success")
             except Exception as e:
                 self.display_message(f"Ошибка при загрузке файла: {e}", message_type="error")
+
+
+
+
+
+
 
 
 

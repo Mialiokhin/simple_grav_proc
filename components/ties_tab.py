@@ -136,12 +136,12 @@ class TiesTab:
         return data
 
     def calculate_ties(self):
-        """Расчет привязок (Ties)"""
+        """Расчет привязок (Ties) с сохранением логов."""
         try:
             method = self.method_var.get()
             by_lines = self.by_lines_var.get()
-            confidence_interval = self.ci_var.get()  # Получение выбранного значения Confidence Interval
-            outlier_method = self.outlier_method_var.get()  # Получение выбранного метода детекции выбросов
+            confidence_interval = self.ci_var.get()
+            outlier_method = self.outlier_method_var.get()
 
             # Получение данных из вкладки Survey Data
             data = self.survey_data_tab.get_dataframe()
@@ -149,82 +149,102 @@ class TiesTab:
             # Применение коэффициентов, если загружены
             data = self.apply_scale_factors(data)
 
-            # Получить survey_name из пути к данным или файлу проекта
+            # Получить survey_name из пути к данным или файла проекта
             survey_name = self.survey_data_tab.data_files_entry.get()
             if not survey_name:
-                # Если файл данных отсутствует, попробуем получить survey_name из первого ряда данных
-                survey_name = self.survey_data_tab.data['survey_name'].iloc[
-                    0] if 'survey_name' in self.survey_data_tab.data.columns else "unknown_survey"
+                survey_name = self.survey_data_tab.data['survey_name'].iloc[0] \
+                    if 'survey_name' in self.survey_data_tab.data.columns else "unknown_survey"
             else:
                 survey_name = os.path.basename(survey_name.split(',')[0]).split('.')[0]
-            # Выбираем папку для сохранения
+
+            # Выбор папки для сохранения
             result_dir = self.choose_output_directory(survey_name, "ties")
             if not result_dir:
                 return
 
-            # Расчет привязок
-            ties = fit_by_meter_created(data, anchor=None, method=method, by_lines=by_lines,
-                                        confidence_interval=confidence_interval, outlier_method=outlier_method)
-            report = get_report(ties)
+            # Открытие файла логов для записи
+            log_file_path = os.path.join(result_dir, f"{survey_name}_ties_log.txt")
+            with open(log_file_path, 'w', encoding='utf-8') as log_file:
+                # Запись начальных параметров
+                log_file.write(f"Calculation method: {method}\n")
+                log_file.write(f"Calculate by lines: {by_lines}\n")
+                log_file.write(f"Confidence Interval: {confidence_interval}%\n")
+                log_file.write(f"Outlier Detection Method: {outlier_method}\n")
+                log_file.write("=" * 50 + "\n")
 
-            # Сохраняем отчет
-            report_file = os.path.join(result_dir, f"{survey_name}_ties_report.txt")
-            with open(report_file, 'w', encoding='utf-8') as f:
-                f.write(report)
+                # Логи из SurveyDataTab
+                log_file.write("=== Logs from SurveyDataTab ===\n")
+                survey_logs = self.survey_data_tab.message_text.get(1.0, tk.END)
+                log_file.write(survey_logs + "\n")
+                log_file.write("=" * 50 + "\n")
 
-            # Выводим отчет в текстовом поле
-            self.report_text_ties.delete(1.0, tk.END)
-            self.report_text_ties.insert(tk.END, report)
+                # Расчет привязок
+                log_file.write("Starting ties calculation...\n")
+                ties = fit_by_meter_created(data, anchor=None, method=method, by_lines=by_lines,
+                                            confidence_interval=confidence_interval, outlier_method=outlier_method)
+                log_file.write("Ties calculation completed.\n")
 
-            # Очистка вкладок с графиками перед их обновлением
-            for tab in self.graphs_notebook.tabs():
-                self.graphs_notebook.forget(tab)
+                report = get_report(ties)
+                report_file = os.path.join(result_dir, f"{survey_name}_ties_report.txt")
+                with open(report_file, 'w', encoding='utf-8') as f:
+                    f.write(report)
 
-            # Проверка на необходимость построения графика остатков
-            if self.plot_var.get():
-                # Создание общего графика остатков
-                fig = residuals_plot(data)
-                # Сохраняем график остатков
-                fig.savefig(os.path.join(result_dir, f"{survey_name}_residuals.png"))
+                log_file.write(f"Report saved\n")
 
-                # Отображаем общий график в новом фрейме внутри Notebook
-                canvas_frame = tk.Frame(self.graphs_notebook)
-                canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
-                canvas.draw()
-                canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-                self.graphs_notebook.add(canvas_frame, text="Residuals")
+                # Вывод отчета в текстовом поле
+                self.report_text_ties.delete(1.0, tk.END)
+                self.report_text_ties.insert(tk.END, report)
 
-                # Проверяем, есть ли больше одной линии
-                if len(data['line'].unique()) > 1 and self.plots_by_lines_var.get():
-                    # Создание отдельной папки для графиков по линиям
-                    line_plots_dir = os.path.join(result_dir, "residuals_plots_by_lines")
-                    os.makedirs(line_plots_dir, exist_ok=True)
+                # Очистка вкладок с графиками перед обновлением
+                for tab in self.graphs_notebook.tabs():
+                    self.graphs_notebook.forget(tab)
 
-                    # Построение и сохранение графиков по линиям
-                    for (line, meter), line_data in data.groupby(['line', 'instrument_serial_number']):
-                        line_fig = residuals_plot(line_data)
-                        meter_suffix = str(meter)[-3:]  # Последние три цифры номера прибора
-                        line_file = f"{survey_name}-{meter_suffix}-line_{line}.png"
-                        line_fig.savefig(os.path.join(line_plots_dir, line_file))
-                        plt.close(line_fig)
+                # Построение графиков остатков
+                if self.plot_var.get():
+                    fig = residuals_plot(data)
+                    residuals_file = os.path.join(result_dir, f"{survey_name}_residuals.png")
+                    fig.savefig(residuals_file)
+                    log_file.write(f"Residuals plot saved\n")
 
-            # Проверка на необходимость создания карты
-            if self.map_var.get():
-                fig_map = get_map(ties)
-                # Сохраняем карту
-                fig_map.savefig(os.path.join(result_dir, f"{survey_name}_map.pdf"), bbox_inches='tight')
+                    canvas_frame = tk.Frame(self.graphs_notebook)
+                    canvas = FigureCanvasTkAgg(fig, master=canvas_frame)
+                    canvas.draw()
+                    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+                    self.graphs_notebook.add(canvas_frame, text="Residuals")
 
-                # Отображаем карту в новом фрейме внутри Notebook
-                canvas_frame = tk.Frame(self.graphs_notebook)
-                canvas_map = FigureCanvasTkAgg(fig_map, master=canvas_frame)
-                canvas_map.draw()
-                canvas_map.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-                self.graphs_notebook.add(canvas_frame, text="Map")
+                    if len(data['line'].unique()) > 1 and self.plots_by_lines_var.get():
+                        line_plots_dir = os.path.join(result_dir, "residuals_plots_by_lines")
+                        os.makedirs(line_plots_dir, exist_ok=True)
+                        log_file.write(f"Residuals plots by lines saved\n")
 
-            # **Сохранение проекта после обработки**
-            project_save_path = os.path.join(result_dir, f"{survey_name}_project.csv")
-            self.survey_data_tab.save_data_to_file(project_save_path)
+                        for (line, meter), line_data in data.groupby(['line', 'instrument_serial_number']):
+                            line_fig = residuals_plot(line_data)
+                            meter_suffix = str(meter)[-3:]
+                            line_file = os.path.join(line_plots_dir, f"{survey_name}-{meter_suffix}-line_{line}.png")
+                            line_fig.savefig(line_file)
+                            plt.close(line_fig)
+                            log_file.write(f"Line {line}, Meter {meter_suffix} plot saved\n")
 
-            messagebox.showinfo("Successfully", f"The calculation of the ties is completed!")
+                # Построение карты
+                if self.map_var.get():
+                    fig_map = get_map(ties)
+                    map_file = os.path.join(result_dir, f"{survey_name}_map.pdf")
+                    fig_map.savefig(map_file, bbox_inches='tight')
+                    log_file.write(f"Map saved\n")
+
+                    canvas_frame = tk.Frame(self.graphs_notebook)
+                    canvas_map = FigureCanvasTkAgg(fig_map, master=canvas_frame)
+                    canvas_map.draw()
+                    canvas_map.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+                    self.graphs_notebook.add(canvas_frame, text="Map")
+
+                # Сохранение проекта после обработки
+                project_save_path = os.path.join(result_dir, f"{survey_name}_project.csv")
+                self.survey_data_tab.save_data_to_file(project_save_path)
+                log_file.write(f"Project saved\n")
+
+            messagebox.showinfo("Successfully",
+                                f"The calculation of the ties is completed!\nLogs saved")
         except Exception as e:
             messagebox.showerror("Error", f"Error in calculating ties: {e}")
+
