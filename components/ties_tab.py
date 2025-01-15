@@ -215,6 +215,10 @@ class TiesTab:
                 canvas_map.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
                 self.graphs_notebook.add(canvas_frame, text="Map")
 
+            # **Сохранение проекта после обработки**
+            project_save_path = os.path.join(result_dir, f"{survey_name}_project.csv")
+            self.survey_data_tab.save_data_to_file(project_save_path)
+
             messagebox.showinfo("Successfully", f"The calculation of the ties is completed!")
         except Exception as e:
             messagebox.showerror("Error", f"Error in calculating ties: {e}")

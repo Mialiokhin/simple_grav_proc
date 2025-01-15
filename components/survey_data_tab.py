@@ -182,7 +182,7 @@ class SurveyDataTab:
         self.series_list_label.pack(pady=5)
         self.series_listbox = tk.Listbox(
             self.edit_series_frame, selectmode=tk.SINGLE,
-            exportselection=False, height=10, width=50
+            exportselection=False, height=10, width=70
         )
         self.series_listbox.pack(pady=5)
         self.series_listbox.bind('<<ListboxSelect>>', self.on_series_select)
@@ -1179,14 +1179,15 @@ class SurveyDataTab:
         self.update_station_listbox()
         self.update_series_listbox()
 
-    def save_data_to_file(self):
+    def save_data_to_file(self, file_path=None):
         """Сохранение всех данных из таблицы в файл CSV."""
         if self.data is not None:
-            file_path = filedialog.asksaveasfilename(
-                title="Save Data As",
-                defaultextension=".csv",
-                filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
-            )
+            if not file_path:
+                file_path = filedialog.asksaveasfilename(
+                    title="Save Data As",
+                    defaultextension=".csv",
+                    filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+                )
             if file_path:
                 try:
                     self.data.to_csv(file_path, index=False)
