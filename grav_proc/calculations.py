@@ -687,39 +687,31 @@ def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degre
         if outlier_detection_method == 'IsolationForest':
             outlier_model = IsolationForest(contamination=contamination, random_state=42)
             outliers = outlier_model.fit_predict(residuals)
+            filtered_indices = outliers != -1
         elif outlier_detection_method == 'LOF':
             outlier_model = LocalOutlierFactor(n_neighbors=20, contamination=contamination)
             outliers = outlier_model.fit_predict(residuals)
+            filtered_indices = outliers != -1
         elif outlier_detection_method == 'Z-score':
             z_scores = np.abs((residuals - np.mean(residuals)) / np.std(residuals))
             threshold = np.percentile(z_scores, confidence_interval)
             outliers = (z_scores <= threshold).astype(int).flatten()
             outliers = np.where(outliers == 0, -1, 1)  # Приводим к формату -1 для выбросов
+            filtered_indices = outliers != -1
         elif outlier_detection_method == 'IsolationForest+LOF':
-            # Сначала фильтруем данные с помощью Isolation Forest
             isolation_forest = IsolationForest(contamination=contamination, random_state=42)
-            isolation_outliers = isolation_forest.fit_predict(residuals)
-            filtered_indices_isolation = isolation_outliers != -1
-
-            # Применяем LOF к данным, прошедшим Isolation Forest
-            filtered_residuals = residuals[filtered_indices_isolation]
+            outliers_isolation = isolation_forest.fit_predict(residuals)
             lof = LocalOutlierFactor(n_neighbors=20, contamination=contamination)
-            lof_outliers = lof.fit_predict(filtered_residuals)
+            outliers_lof = lof.fit_predict(residuals)
 
-            # Объединяем результаты: выбросы, определенные любым из методов
-            final_outliers = np.full(residuals.shape[0], 1)
-            final_outliers[~filtered_indices_isolation] = -1  # Выбросы из Isolation Forest
-            final_outliers[filtered_indices_isolation] = lof_outliers
-
-            outliers = final_outliers
+            # Логическое объединение выбросов
+            outliers = (outliers_isolation == -1) | (outliers_lof == -1)
+            filtered_indices = ~outliers
         else:
             raise ValueError("Unsupported outlier detection method")
 
-        # Отфильтровываем данные, которые не являются выбросами
-        filtered_indices = outliers != -1
-
-        # Считаем оставшиеся и общее количество измерений
-        remaining_measurements = filtered_indices.sum()
+        # Фильтруем данные
+        remaining_measurements = np.sum(filtered_indices)
         total_measurements = len(residuals)
 
         # Если данных не осталось, возвращаем предупреждение
