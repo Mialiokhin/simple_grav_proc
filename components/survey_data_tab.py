@@ -1,3 +1,4 @@
+import os
 import tkinter as tk
 import datetime
 from tkinter import filedialog
@@ -1255,15 +1256,18 @@ class SurveyDataTab:
                 self.message_text.configure(state='disabled')
 
                 # Загрузка логов
-                log_file_path = file_path.replace('.csv', '_log.txt')
-                try:
+                directory = os.path.dirname(file_path)
+                log_file_name = next((f for f in os.listdir(directory) if f.endswith('_log.txt')), None)
+
+                if log_file_name:
+                    log_file_path = os.path.join(directory, log_file_name)
                     with open(log_file_path, 'r', encoding='utf-8') as log_file:
                         logs = log_file.read()
                         self.message_text.configure(state='normal')
                         self.message_text.delete(1.0, tk.END)
                         self.message_text.insert(tk.END, logs)
                         self.message_text.configure(state='disabled')
-                except FileNotFoundError:
+                else:
                     self.display_message("Лог-файл не найден. Загружается только проект.", message_type="warning")
 
                 self.display_message(f"Проект успешно загружен: {file_path}", message_type="success")
