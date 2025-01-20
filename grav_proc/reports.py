@@ -27,8 +27,7 @@ def get_report(ties):
     if table_by_date:
         report += f'\n\nMean values for reverse ties (by date and serial number):\n=============================\n{table_by_date}'
 
-    unique_serial_numbers = ties['instrument_serial_number'].nunique()
-    if unique_serial_numbers > 1 and table_by_sn:
+    if table_by_sn:
         report += f'\n\nMean values for reverse ties (by serial number only):\n=============================\n{table_by_sn}'
 
     # Суммы связей
