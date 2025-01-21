@@ -8,3 +8,6 @@ matplotlib
 statsmodels
 contextily
 cartopy
+fiona
+pyproj
+shapely
