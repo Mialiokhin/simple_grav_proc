@@ -175,6 +175,12 @@ class SurveyDataTab:
         )
         self.delete_station_button.pack(side='left', padx=5)
 
+        # Reason
+        self.station_reason_label = tk.Label(station_buttons_frame, text="Reason:")
+        self.station_reason_label.pack(side='left', padx=(10, 5))
+        self.station_reason_entry = tk.Entry(station_buttons_frame, width=20)
+        self.station_reason_entry.pack(side='left', padx=(0, 5))
+
         # Фрейм для редактирования серий
         self.edit_series_frame = tk.Frame(controls_frame)
         # Изначально скрываем
@@ -254,6 +260,12 @@ class SurveyDataTab:
             command=self.copy_selected_series
         )
         self.copy_series_button.pack(side='left', padx=5)
+
+        # Reason
+        self.series_reason_label = tk.Label(series_buttons_frame, text="Reason:")
+        self.series_reason_label.pack(side='left', padx=(10, 5))
+        self.series_reason_entry = tk.Entry(series_buttons_frame, width=20)
+        self.series_reason_entry.pack(side='left', padx=(0, 5))
 
         # Добавляем фрейм для сообщений и размещаем его внизу
         message_frame = tk.Frame(controls_frame)
@@ -476,7 +488,16 @@ class SurveyDataTab:
 
                 # Выводим сообщение об изменениях
                 changes_str = "; ".join(changes)
-                self.display_message(f"Станция '{station_name}' обновлена: {changes_str}", message_type="success")
+                reason = self.station_reason_entry.get().strip()  # Получаем причину, если она указана
+
+                # Формируем сообщение с учетом причины
+                if reason:
+                    self.display_message(f"Станция '{station_name}' обновлена: {changes_str}. Причина: {reason}",
+                                         message_type="success")
+                    # Очищаем поле "Причина"
+                    self.station_reason_entry.delete(0, tk.END)
+                else:
+                    self.display_message(f"Станция '{station_name}' обновлена: {changes_str}", message_type="success")
 
                 # Переключение на следующую станцию
                 next_index = selected_index[0] + 1
@@ -494,6 +515,8 @@ class SurveyDataTab:
         selected_index = self.station_listbox.curselection()
         if selected_index:
             station_name = self.station_listbox.get(selected_index)
+            reason = self.station_reason_entry.get().strip()  # Получаем причину, если она указана
+
             # Удаляем данные станции из DataFrame
             self.data = self.data[self.data['station'] != station_name].copy()
             # Обновляем series_id после удаления
@@ -508,7 +531,14 @@ class SurveyDataTab:
             self.station_lat_entry.delete(0, tk.END)
             self.station_lon_entry.delete(0, tk.END)
             self.pressure_entry_station.delete(0, tk.END)
-            self.display_message(f"Станция '{station_name}' успешно удалена.", message_type="success")
+
+            # Формируем сообщение с учетом причины
+            if reason:
+                self.display_message(f"Станция '{station_name}' успешно удалена. Причина: {reason}",
+                                     message_type="success")
+                self.station_reason_entry.delete(0, tk.END)  # Очищаем поле "Причина"
+            else:
+                self.display_message(f"Станция '{station_name}' успешно удалена.", message_type="success")
         else:
             self.display_message("Пожалуйста, выберите станцию для удаления.", message_type="warning")
 
@@ -649,9 +679,19 @@ class SurveyDataTab:
 
                 # Выводим сообщение об изменениях
                 changes_str = "; ".join(changes)
-                self.display_message(
-                    f"Серия {series_id} (Станция: {new_station_name if new_station_name else self.data.loc[self.data['series_id'] == series_id, 'station'].iloc[0]}) обновлена: {changes_str}",
-                    message_type="success")
+                reason = self.series_reason_entry.get().strip()  # Получаем причину, если она указана
+
+                # Формируем сообщение с учетом причины
+                if reason:
+                    self.display_message(
+                        f"Серия {series_id} (Станция: {new_station_name if new_station_name else self.data.loc[self.data['series_id'] == series_id, 'station'].iloc[0]}) обновлена: {changes_str}. Причина: {reason}",
+                        message_type="success")
+                    # Очищаем поле "Причина"
+                    self.series_reason_entry.delete(0, tk.END)
+                else:
+                    self.display_message(
+                        f"Серия {series_id} (Станция: {new_station_name if new_station_name else self.data.loc[self.data['series_id'] == series_id, 'station'].iloc[0]}) обновлена: {changes_str}",
+                        message_type="success")
 
                 # Найти индекс следующей серии
                 next_index = selected_index[0] + 1
@@ -666,25 +706,37 @@ class SurveyDataTab:
             self.display_message("Пожалуйста, выберите серию для изменения.", message_type="warning")
 
     def delete_series(self):
-        """Удаление выбранной серии"""
+        """Удаление выбранной серии с добавлением причины в сообщение."""
         selected_index = self.series_listbox.curselection()
         if selected_index:
             series_id = self.data['series_id'].unique()[selected_index[0]]
+            reason = self.series_reason_entry.get().strip()  # Получаем причину, если она указана
+
             # Удаляем данные серии из DataFrame
             self.data = self.data[self.data['series_id'] != series_id].copy()
+
             # Обновляем series_id после удаления
             self.update_series_id()
+
             # Обновляем отображение таблицы
             self.table.update_data(self.data)
+
             # Обновляем списки
             self.update_station_listbox()
             self.update_series_listbox()
+
             # Очищаем поля ввода
             self.series_station_entry.delete(0, tk.END)
             self.series_lat_entry.delete(0, tk.END)
             self.series_lon_entry.delete(0, tk.END)
             self.pressure_entry.delete(0, tk.END)
-            self.display_message(f"Серия {series_id} успешно удалена.", message_type="success")
+
+            # Формируем сообщение с учетом причины
+            if reason:
+                self.display_message(f"Серия {series_id} успешно удалена. Причина: {reason}", message_type="success")
+                self.series_reason_entry.delete(0, tk.END)  # Очищаем поле "Причина"
+            else:
+                self.display_message(f"Серия {series_id} успешно удалена.", message_type="success")
         else:
             self.display_message("Пожалуйста, выберите серию для удаления.", message_type="warning")
 
@@ -1067,7 +1119,7 @@ class SurveyDataTab:
         return df_processed
 
     def copy_selected_series(self):
-        """Дублирует выбранную серию и добавляет копию сразу после неё."""
+        """Копирование выбранной серии с добавлением причины в сообщение."""
         try:
             # Получаем индекс выбранной серии
             selected_index = self.series_listbox.curselection()
@@ -1077,6 +1129,7 @@ class SurveyDataTab:
 
             # Определяем ID выбранной серии
             selected_series_id = self.data['series_id'].unique()[selected_index[0]]
+            reason = self.series_reason_entry.get().strip()  # Получаем причину, если она указана
 
             # Получаем данные выбранной серии
             selected_series_data = self.data[self.data['series_id'] == selected_series_id]
@@ -1101,8 +1154,15 @@ class SurveyDataTab:
             self.table.update_data(self.data)
             self.update_series_listbox()
 
-            self.display_message(f"Серия {selected_series_id} успешно скопирована как {new_series_id}.",
-                                 message_type="success")
+            # Формируем сообщение с учетом причины
+            if reason:
+                self.display_message(
+                    f"Серия {selected_series_id} успешно скопирована как {new_series_id}. Причина: {reason}",
+                    message_type="success")
+                self.series_reason_entry.delete(0, tk.END)  # Очищаем поле "Причина"
+            else:
+                self.display_message(f"Серия {selected_series_id} успешно скопирована как {new_series_id}.",
+                                     message_type="success")
         except Exception as e:
             self.display_message(f"Ошибка при копировании серии: {e}", message_type="error")
 
