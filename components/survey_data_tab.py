@@ -366,9 +366,11 @@ class SurveyDataTab:
                     if pressure_file:
                         with open(pressure_file, 'r', encoding='utf-8') as pf:
                             try:
-                                pressure_values = [
-                                    float(line.strip()) for line in pf.readlines() if line.strip()
-                                ]
+                                pressure_values = []
+                                for line in pf:
+                                    # Берем только первое значение в строке, разделённой пробелами
+                                    value = line.split()[0].replace(',', '.')
+                                    pressure_values.append(float(value))
                             except ValueError:
                                 loaded_files_info.append(
                                     f"Файл давления: {os.path.basename(pressure_file)} содержит некорректные данные."
