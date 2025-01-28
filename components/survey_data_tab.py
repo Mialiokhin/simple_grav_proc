@@ -313,60 +313,119 @@ class SurveyDataTab:
             self.edit_series_frame.pack(pady=5)
 
     def load_data_files(self):
-        """Загрузка файлов данных и отображение в таблице"""
-
-        files = filedialog.askopenfilenames(
+        """Загрузка файлов данных и соответствующих файлов давления."""
+        data_files = filedialog.askopenfilenames(
             title="Select the data files",
             filetypes=[("CG-6 Data Files", "*.dat"), ("All files", "*.*")]
         )
         self.data_files_entry.delete(0, tk.END)
-        self.data_files_entry.insert(0, ','.join(files))
+        self.data_files_entry.insert(0, ','.join(data_files))
 
-        if not files:
+        if not data_files:
             return
+
+        # Очищаем поле сообщений
+        self.message_text.configure(state='normal')
+        self.message_text.delete(1.0, tk.END)
+        self.message_text.configure(state='disabled')
+
+        # Определяем наличие файлов давления
+        pressure_files = filedialog.askopenfilenames(
+            title="Select the pressure files (optional)",
+            filetypes=[("Pressure Files", "*.txt"), ("All files", "*.*")]
+        )
+
+        # Сопоставление файлов данных с файлами давления
+        pressure_files_map = {}
+        for p_file in pressure_files:
+            base_name = os.path.basename(p_file).rsplit('_pressure.txt', 1)[0]
+            pressure_files_map[base_name] = p_file
 
         try:
-            # Загрузка данных с безопасным открытием файлов
-            with ExitStack() as stack:
-                data_files = [stack.enter_context(open(file, 'r', encoding='utf-8')) for file in files]
-                raw_data = read_data(data_files)
+            combined_data = []
+            loaded_files_info = []  # Список для сообщений о загрузке
 
-            self.data = make_frame_to_proc(raw_data).copy()
-            # Очищаем поле сообщений
-            self.message_text.configure(state='normal')
-            self.message_text.delete(1.0, tk.END)
-            self.message_text.configure(state='disabled')
+            for data_file in data_files:
+                base_name = os.path.basename(data_file).rsplit('.dat', 1)[0]
+                pressure_file = pressure_files_map.get(base_name)
+
+                # Загрузка данных
+                with open(data_file, 'r', encoding='utf-8') as df:
+                    raw_data = read_data([df])
+                    processed_data = make_frame_to_proc(raw_data)
+
+                    # Подсчет количества смен станций
+                    station_count = 1
+                    current_station = processed_data.iloc[0]['station']
+                    for station in processed_data['station']:
+                        if station != current_station:
+                            station_count += 1
+                            current_station = station
+
+                    # Если файл давления существует, проверяем его содержимое
+                    if pressure_file:
+                        with open(pressure_file, 'r', encoding='utf-8') as pf:
+                            try:
+                                pressure_values = [
+                                    float(line.strip()) for line in pf.readlines() if line.strip()
+                                ]
+                            except ValueError:
+                                loaded_files_info.append(
+                                    f"Файл давления: {os.path.basename(pressure_file)} содержит некорректные данные."
+                                )
+                                pressure_values = []
+
+                        if len(pressure_values) < station_count:
+                            loaded_files_info.append(
+                                f"Файл данных: {os.path.basename(data_file)} -> Файл давления: {os.path.basename(pressure_file)} (НЕ СООТВЕТСТВУЕТ: станций={station_count}, давлений={len(pressure_values)}). Поле давления заполнено пустыми значениями."
+                            )
+                            processed_data['pressure'] = None
+                        else:
+                            # Назначение давления для каждой станции
+                            current_station = processed_data.iloc[0]['station']
+                            pressure_index = 0
+                            for idx, row in processed_data.iterrows():
+                                if row['station'] != current_station:
+                                    current_station = row['station']
+                                    pressure_index = min(pressure_index + 1, len(pressure_values) - 1)
+
+                                processed_data.at[idx, 'pressure'] = pressure_values[pressure_index]
+
+                            loaded_files_info.append(
+                                f"Файл данных: {os.path.basename(data_file)} -> Файл давления: {os.path.basename(pressure_file)}"
+                            )
+                    else:
+                        # Если файла давления нет, добавляем пустое поле
+                        processed_data['pressure'] = None
+                        loaded_files_info.append(
+                            f"Файл данных: {os.path.basename(data_file)} -> Файл давления: отсутствует"
+                        )
+
+                    combined_data.append(processed_data)
+
+            # Объединяем все данные в единый DataFrame
+            self.data = pd.concat(combined_data, ignore_index=True)
+
+            # Добавляем колонку для series_id
+            self.update_series_id()
+
+            # Если таблица уже существует, обновляем её
+            if self.table:
+                self.table.update_data(self.data)
+            else:
+                self.table = InputDataTable(self.table_frame, self.data, data_modified_callback=self.on_data_modified)
+
+            # Обновляем списки станций и серий
+            self.update_station_listbox()
+            self.update_series_listbox()
+
+            # Вывод подробного сообщения
+            self.display_message(
+                "Файлы данных успешно загружены:\n" + "\n".join(loaded_files_info),
+                message_type="success"
+            )
         except Exception as e:
-            self.display_message(f"Не удалось загрузить данные: {e}", message_type="error")
-            return
-
-        # Проверка наличия необходимых столбцов
-        required_columns = ['station', 'instrument_serial_number', 'created', 'line', 'lat', 'lon', 'corr_grav',
-                            'date_time']
-        missing_columns = [col for col in required_columns if col not in self.data.columns]
-        if missing_columns:
-            self.display_message(f"Отсутствуют необходимые столбцы: {', '.join(missing_columns)}", message_type="error")
-            return
-
-        # Добавляем колонку для серии
-        self.update_series_id()
-
-        # Добавляем колонку для атмосферного давления, если её нет
-        if 'pressure' not in self.data.columns:
-            self.data.loc[:, 'pressure'] = None
-
-        # Если таблица уже существует, удаляем её перед созданием новой
-        if self.table:
-            self.table.tree.pack_forget()
-            self.table.v_scroll.pack_forget()
-            self.table.h_scroll.pack_forget()
-
-        # Отображаем данные в таблице
-        self.table = InputDataTable(self.table_frame, self.data, data_modified_callback=self.on_data_modified)
-
-        # Обновляем списки в Listbox
-        self.update_station_listbox()
-        self.update_series_listbox()
+            self.display_message(f"Ошибка при загрузке файлов: {e}", message_type="error")
 
     def update_series_id(self):
         """Обновление столбца 'series_id' на основе текущих данных"""
@@ -419,54 +478,60 @@ class SurveyDataTab:
 
             changes = []  # Список для хранения изменений
 
-            # Высота инструмента
+            # Сохраняем изначальные значения
+            current_data = self.data[self.data['station'] == station_name]
+            if current_data.empty:
+                self.display_message(f"Станция '{station_name}' не найдена в данных.", message_type="error")
+                return
+
+            current_lat = current_data.iloc[0]['lat']
+            current_lon = current_data.iloc[0]['lon']
+            current_pressure = current_data.iloc[0].get('pressure', None)
+            current_height = current_data.iloc[0]['instr_height']
+
+            # Проверка высоты инструмента
             if new_height_str:
                 try:
                     new_height = float(new_height_str.replace(",", "."))
-                    current_height = self.data.loc[self.data['station'] == station_name, 'instr_height'].iloc[0]
-                    if new_height != current_height:
+                    if new_height != current_height:  # Изменения только при отличии
                         self.data.loc[self.data['station'] == station_name, 'instr_height'] = new_height
                         changes.append(f"Instr.Height: {current_height} → {new_height}")
                 except ValueError:
                     self.display_message("Введите корректное значение для высоты инструмента.", message_type="warning")
                     return
 
-            # Имя станции
-            if new_name and new_name != station_name:
+            # Проверка имени станции
+            if new_name and new_name != station_name:  # Изменение имени только при отличии
                 self.data.loc[self.data['station'] == station_name, 'station'] = new_name
                 changes.append(f"Station Name: {station_name} → {new_name}")
 
-            # Широта
+            # Проверка широты
             if new_lat_str:
                 try:
                     new_lat = float(new_lat_str.replace(",", "."))
-                    current_lat = self.data.loc[self.data['station'] == (new_name or station_name), 'lat'].iloc[0]
-                    if new_lat != current_lat:
+                    if new_lat != current_lat:  # Изменения только при отличии
                         self.data.loc[self.data['station'] == (new_name or station_name), 'lat'] = new_lat
                         changes.append(f"Lat: {current_lat} → {new_lat}")
                 except ValueError:
                     self.display_message("Введите корректное значение для широты.", message_type="warning")
                     return
 
-            # Долгота
+            # Проверка долготы
             if new_lon_str:
                 try:
                     new_lon = float(new_lon_str.replace(",", "."))
-                    current_lon = self.data.loc[self.data['station'] == (new_name or station_name), 'lon'].iloc[0]
-                    if new_lon != current_lon:
+                    if new_lon != current_lon:  # Изменения только при отличии
                         self.data.loc[self.data['station'] == (new_name or station_name), 'lon'] = new_lon
                         changes.append(f"Lon: {current_lon} → {new_lon}")
                 except ValueError:
                     self.display_message("Введите корректное значение для долготы.", message_type="warning")
                     return
 
-            # Давление
+            # Проверка давления
             if new_pressure_str:
                 try:
                     new_pressure = float(new_pressure_str.replace(",", "."))
-                    current_pressure = \
-                        self.data.loc[self.data['station'] == (new_name or station_name), 'pressure'].iloc[0]
-                    if pd.isnull(current_pressure) or new_pressure != current_pressure:
+                    if pd.isnull(current_pressure) or new_pressure != current_pressure:  # Изменения только при отличии
                         self.data.loc[self.data['station'] == (new_name or station_name), 'pressure'] = new_pressure
                         changes.append(f"Pressure: {current_pressure} → {new_pressure}")
                 except ValueError:
@@ -485,12 +550,13 @@ class SurveyDataTab:
                 self.station_lat_entry.delete(0, tk.END)
                 self.station_lon_entry.delete(0, tk.END)
                 self.pressure_entry_station.delete(0, tk.END)
+                self.station_height_entry.delete(0, tk.END)
 
                 # Выводим сообщение об изменениях
                 changes_str = "; ".join(changes)
                 reason = self.station_reason_entry.get().strip()  # Получаем причину, если она указана
 
-                # Формируем сообщение с учетом причины
+                # Формируем сообщение с учётом причины
                 if reason:
                     self.display_message(f"Станция '{station_name}' обновлена: {changes_str}. Причина: {reason}",
                                          message_type="success")
@@ -506,7 +572,7 @@ class SurveyDataTab:
                     self.station_listbox.selection_set(next_index)
                     self.station_listbox.event_generate('<<ListboxSelect>>')
             else:
-                self.display_message("Нет изменений для сохранения.", message_type="success")
+                self.display_message("Нет изменений для сохранения.", message_type="info")
         else:
             self.display_message("Пожалуйста, выберите станцию для изменения.", message_type="warning")
 
