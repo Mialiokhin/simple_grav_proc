@@ -656,7 +656,6 @@ def to_seconds(value):
 # Функция для оценки свободных привязок и дрифта
 def free_grav_fit(stations, gravity, date_time, fix_station, std=None, max_degree=2, method='WLS',
                   confidence_interval=95, outlier_detection_method='IsolationForest'):
-
     # Создание матрицы наблюдений для станций
     observation_matrix = pd.get_dummies(stations).drop(fix_station, axis=1)
 
@@ -912,7 +911,8 @@ def get_meter_ties_all(readings):
 
 
 # Основная функция расчета приращений для конкретного прибора и его измерений
-def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False, confidence_interval=100, outlier_method='IsolationForest'):
+def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False, confidence_interval=100,
+                         outlier_method='IsolationForest'):
     ties = pd.DataFrame()
     fix_station = anchor
 
@@ -969,3 +969,22 @@ def fit_by_meter_created(raw_data, anchor, method='WLS', by_lines=False, confide
         ties = pd.concat([ties, fitgrav], ignore_index=True)
 
     return ties
+
+
+def dms_to_decimal(dms_str):
+    """
+    Конвертирует строку в формате 'градусы минуты секунды' в десятичные градусы.
+    Если формат не соответствует, возвращает None.
+    """
+    try:
+        parts = dms_str.strip().split()
+        if len(parts) == 3:  # Проверяем, что это DMS формат
+            degrees = float(parts[0])
+            minutes = float(parts[1])
+            seconds = float(parts[2])
+            decimal = degrees + minutes / 60 + seconds / 3600
+            return decimal
+        else:
+            return float(dms_str)  # Если это уже десятичный формат
+    except ValueError:
+        return None

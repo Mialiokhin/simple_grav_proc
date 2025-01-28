@@ -4,7 +4,7 @@ import datetime
 from tkinter import filedialog
 from components.input_data_table import InputDataTable
 from grav_proc.loader import read_data
-from grav_proc.calculations import make_frame_to_proc
+from grav_proc.calculations import make_frame_to_proc, dms_to_decimal
 from grav_proc.tidal import TIDEFF
 import pandas as pd
 from contextlib import ExitStack
@@ -515,7 +515,10 @@ class SurveyDataTab:
             # Проверка широты
             if new_lat_str:
                 try:
-                    new_lat = float(new_lat_str.replace(",", "."))
+                    new_lat = dms_to_decimal(new_lat_str.replace(",", "."))
+                    if new_lat is None:  # Проверяем, вернула ли функция None
+                        self.display_message("Введите корректное значение для широты.", message_type="warning")
+                        return
                     if new_lat != current_lat:  # Изменения только при отличии
                         self.data.loc[self.data['station'] == (new_name or station_name), 'lat'] = new_lat
                         changes.append(f"Lat: {current_lat} → {new_lat}")
@@ -526,7 +529,10 @@ class SurveyDataTab:
             # Проверка долготы
             if new_lon_str:
                 try:
-                    new_lon = float(new_lon_str.replace(",", "."))
+                    new_lon = dms_to_decimal(new_lon_str.replace(",", "."))
+                    if new_lon is None:  # Проверяем, вернула ли функция None
+                        self.display_message("Введите корректное значение для долготы.", message_type="warning")
+                        return
                     if new_lon != current_lon:  # Изменения только при отличии
                         self.data.loc[self.data['station'] == (new_name or station_name), 'lon'] = new_lon
                         changes.append(f"Lon: {current_lon} → {new_lon}")
@@ -664,25 +670,31 @@ class SurveyDataTab:
             # Широта
             if new_lat_str:
                 try:
-                    new_lat = float(new_lat_str.replace(",", "."))
+                    new_lat = dms_to_decimal(new_lat_str.replace(",", "."))
+                    if new_lat is None:  # Если функция вернула None, значит значение некорректное
+                        self.display_message("Введите корректное значение для широты.", message_type="warning")
+                        return
                     current_lat = self.data.loc[self.data['series_id'] == series_id, 'lat'].iloc[0]
-                    if new_lat != current_lat:
+                    if new_lat != current_lat:  # Изменения только при отличии
                         self.data.loc[self.data['series_id'] == series_id, 'lat'] = new_lat
                         changes.append(f"Lat: {current_lat} → {new_lat}")
                 except ValueError:
-                    self.display_message("Введите корректное числовое значение для широты.", message_type="warning")
+                    self.display_message("Введите корректное значение для широты.", message_type="warning")
                     return
 
             # Долгота
             if new_lon_str:
                 try:
-                    new_lon = float(new_lon_str.replace(",", "."))
+                    new_lon = dms_to_decimal(new_lon_str.replace(",", "."))
+                    if new_lon is None:  # Если функция вернула None, значит значение некорректное
+                        self.display_message("Введите корректное значение для долготы.", message_type="warning")
+                        return
                     current_lon = self.data.loc[self.data['series_id'] == series_id, 'lon'].iloc[0]
-                    if new_lon != current_lon:
+                    if new_lon != current_lon:  # Изменения только при отличии
                         self.data.loc[self.data['series_id'] == series_id, 'lon'] = new_lon
                         changes.append(f"Lon: {current_lon} → {new_lon}")
                 except ValueError:
-                    self.display_message("Введите корректное числовое значение для долготы.", message_type="warning")
+                    self.display_message("Введите корректное значение для долготы.", message_type="warning")
                     return
 
             # Давление
