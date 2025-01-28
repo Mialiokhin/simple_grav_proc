@@ -3,10 +3,11 @@ from tkinter import messagebox, ttk
 
 
 class InputDataTable:
-    def __init__(self, parent, dataframe, data_modified_callback=None):
+    def __init__(self, parent, dataframe, data_modified_callback=None, survey_tab=None):
         self.parent = parent
         self.dataframe = dataframe.copy()
-        self.data_modified_callback = data_modified_callback  # Добавляем обратный вызов
+        self.data_modified_callback = data_modified_callback  # Обратный вызов для обновления данных
+        self.survey_tab = survey_tab  # Ссылка на SurveyDataTab
         self.tree = None
         self.v_scroll = None
         self.h_scroll = None
@@ -137,61 +138,86 @@ class InputDataTable:
         if self.entry_popup:
             new_value = self.entry_popup.get()
             current_values = list(self.tree.item(row_id, "values"))
+            old_value = current_values[column_index]
+
+            # Если значение не изменилось, ничего не делаем
+            if str(old_value) == str(new_value):
+                self.entry_popup.destroy()
+                self.entry_popup = None
+                return
+
             current_values[column_index] = new_value
 
-            # Обновляем данные в таблице
-            self.tree.item(row_id, values=current_values)
-
-            # Обновляем DataFrame
             row_index = self.tree.index(row_id)
-            if column_index == 0:
-                pass  # Не обновляем номер строки
-            else:
-                df_col_index = column_index - 1  # Смещение из-за колонки "#"
-                col_name = self.dataframe.columns[df_col_index]
+            df_col_index = column_index - 1  # Смещение из-за колонки "#"
+            col_name = self.dataframe.columns[df_col_index]
+            station = self.dataframe.loc[row_index, 'station']
+            line = self.dataframe.loc[row_index, 'line']
+            series = self.dataframe.loc[row_index, 'series_id']
 
-                # Приведение типов
-                if self.dataframe[col_name].dtype == "float64":
-                    try:
-                        new_value = float(new_value)
-                    except ValueError:
-                        messagebox.showerror("Ошибка", "Пожалуйста, введите корректное числовое значение.")
-                        self.entry_popup.destroy()
-                        self.entry_popup = None
-                        return
-                elif self.dataframe[col_name].dtype == "int64":
-                    try:
-                        new_value = int(new_value)
-                    except ValueError:
-                        messagebox.showerror("Ошибка", "Пожалуйста, введите корректное целочисленное значение.")
-                        self.entry_popup.destroy()
-                        self.entry_popup = None
-                        return
-
-                self.dataframe.at[row_index, col_name] = new_value
-
-                # Если 'line' или 'station' изменились, обновляем таблицу
-                if col_name in ["line", "station"]:
+            # Приведение типов
+            if self.dataframe[col_name].dtype == "float64":
+                try:
+                    new_value = float(new_value)
+                except ValueError:
+                    messagebox.showerror("Ошибка", "Пожалуйста, введите корректное числовое значение.")
                     self.entry_popup.destroy()
                     self.entry_popup = None
+                    return
+            elif self.dataframe[col_name].dtype == "int64":
+                try:
+                    new_value = int(new_value)
+                except ValueError:
+                    messagebox.showerror("Ошибка", "Пожалуйста, введите корректное целочисленное значение.")
+                    self.entry_popup.destroy()
+                    self.entry_popup = None
+                    return
 
-                    self.dataframe.reset_index(drop=True, inplace=True)
-                    self.setup_table()
-                    # Вызываем обратный вызов
-                    if self.data_modified_callback:
-                        self.data_modified_callback()
-                    return  # Уже обновлено, выходим из функции
+            # Обновляем DataFrame
+            self.dataframe.at[row_index, col_name] = new_value
+
+            # Если 'line' или 'station' изменились, обновляем таблицу
+            if col_name in ["line", "station"]:
+                # Отправляем сообщение в SurveyDataTab
+                if self.survey_tab:
+                    self.survey_tab.display_message(
+                        f"Изменение данных: линия {line}, серия {series}, станция {station}, строка {row_index + 1}, "
+                        f"колонка '{col_name}', старое значение: {old_value}, новое значение: {new_value}.",
+                        message_type="info"
+                    )
+
+                # Закрываем поле редактирования
+                self.entry_popup.destroy()
+                self.entry_popup = None
+
+                # Сбрасываем индекс и обновляем таблицу
+                self.dataframe.reset_index(drop=True, inplace=True)
+                self.setup_table()
+
+                # Вызываем обратный вызов
+                if self.data_modified_callback:
+                    self.data_modified_callback()
+                return
+
 
             # Закрываем поле редактирования
             self.entry_popup.destroy()
             self.entry_popup = None
+
+            # Отправляем сообщение в SurveyDataTab
+            if self.survey_tab:
+                self.survey_tab.display_message(
+                    f"Изменение данных: линия {line}, серия {series}, станция {station}, строка {row_index + 1}, "
+                    f"колонка '{col_name}', старое значение: {old_value}, новое значение: {new_value}.",
+                    message_type="info"
+                )
 
             # Вызываем обратный вызов после изменения данных
             if self.data_modified_callback:
                 self.data_modified_callback()
 
     def delete_selected_rows(self, event=None):
-        """Удаление выбранных строк и обновление нумерации."""
+        """Удаление выбранных строк и отправка сообщений."""
         selected_items = self.tree.selection()
         if not selected_items:
             return
@@ -199,12 +225,27 @@ class InputDataTable:
             "Удаление", "Вы уверены, что хотите удалить выбранные строки?"
         )
         if confirm:
-            # Получаем индексы строк для удаления
-            indices_to_delete = [self.tree.index(item) for item in selected_items]
+            # Список для хранения информации о удаленных строках
+            deleted_rows_info = []
+
+            for item in selected_items:
+                row_index = self.tree.index(item)
+                row_data = self.dataframe.iloc[row_index]
+
+                # Извлечение значений corr_grav и std_err
+                corr_grav = row_data.get('corr_grav', 'N/A')  # Если столбец отсутствует, используется 'N/A'
+                std_err = row_data.get('std_err', 'N/A')
+
+                # Добавляем информацию о строке
+                deleted_rows_info.append(
+                    f"строка {row_index + 1}, линия {row_data['line']}, серия {row_data['series_id']}, "
+                    f"станция {row_data['station']}, corr_grav={corr_grav}, std_err={std_err}"
+                )
 
             # Удаляем строки из DataFrame
+            indices_to_delete = [self.tree.index(item) for item in selected_items]
             self.dataframe.drop(self.dataframe.index[indices_to_delete], inplace=True)
-            self.dataframe.reset_index(drop=True, inplace=True)  # Сбрасываем индексы
+            self.dataframe.reset_index(drop=True, inplace=True)
 
             # Очищаем дерево и пересоздаем таблицу
             self.setup_table()
@@ -212,6 +253,13 @@ class InputDataTable:
             # Вызываем обратный вызов после изменения данных
             if self.data_modified_callback:
                 self.data_modified_callback()
+
+            # Формируем сообщение с переносами строк
+            deleted_rows_message = "Удалены строки:\n" + "\n".join(deleted_rows_info)
+
+            # Отправляем сообщение в SurveyDataTab
+            if self.survey_tab:
+                self.survey_tab.display_message(deleted_rows_message, message_type="warning")
 
     def get_dataframe(self):
         """Возвращаем DataFrame с изменениями."""

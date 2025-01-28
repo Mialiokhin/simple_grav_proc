@@ -415,7 +415,11 @@ class SurveyDataTab:
             if self.table:
                 self.table.update_data(self.data)
             else:
-                self.table = InputDataTable(self.table_frame, self.data, data_modified_callback=self.on_data_modified)
+                self.table = InputDataTable(
+                    self.table_frame, self.data,
+                    data_modified_callback=self.on_data_modified,
+                    survey_tab=self
+                )
 
             # Обновляем списки станций и серий
             self.update_station_listbox()
