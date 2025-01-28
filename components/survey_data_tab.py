@@ -352,7 +352,7 @@ class SurveyDataTab:
                 # Загрузка данных
                 with open(data_file, 'r', encoding='utf-8') as df:
                     raw_data = read_data([df])
-                    processed_data = make_frame_to_proc(raw_data)
+                    processed_data = make_frame_to_proc(raw_data).copy()
 
                     # Подсчет количества смен станций
                     station_count = 1
@@ -379,7 +379,8 @@ class SurveyDataTab:
 
                         if len(pressure_values) < station_count:
                             loaded_files_info.append(
-                                f"Файл данных: {os.path.basename(data_file)} -> Файл давления: {os.path.basename(pressure_file)} (НЕ СООТВЕТСТВУЕТ: станций={station_count}, давлений={len(pressure_values)}). Поле давления заполнено пустыми значениями."
+                                f"Файл данных: {os.path.basename(data_file)} -> Файл давления: {os.path.basename(pressure_file)} "
+                                f"(НЕ СООТВЕТСТВУЕТ: станций={station_count}, давлений={len(pressure_values)}). Поле давления заполнено пустыми значениями."
                             )
                             processed_data['pressure'] = None
                         else:
@@ -391,7 +392,7 @@ class SurveyDataTab:
                                     current_station = row['station']
                                     pressure_index = min(pressure_index + 1, len(pressure_values) - 1)
 
-                                processed_data.at[idx, 'pressure'] = pressure_values[pressure_index]
+                                processed_data.loc[idx, 'pressure'] = pressure_values[pressure_index]
 
                             loaded_files_info.append(
                                 f"Файл данных: {os.path.basename(data_file)} -> Файл давления: {os.path.basename(pressure_file)}"
