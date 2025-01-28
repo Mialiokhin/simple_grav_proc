@@ -1246,7 +1246,7 @@ class SurveyDataTab:
             line_closure_errors = []  # Список для ошибок замыкания линий
             grouped_by_station = self.data.groupby('station')  # Группируем данные по станции
             grouped_by_line = self.data.groupby('line')  # Группируем данные по линии
-            threshold = 0.001  # Порог для стандартного отклонения
+            threshold = 0.015  # Порог для стандартного отклонения в градусах (≈1 км для Беларуси)
 
             # Проверка расхождений в координатах
             for station, group in grouped_by_station:
